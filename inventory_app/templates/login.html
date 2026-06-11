@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login — Inventory System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body { background: #0f172a; color: #e2e8f0; font-family: monospace; background-image: url('/static/bg.jpg'); background-size: cover; background-attachment: fixed; background-position: center; background-blend-mode: overlay; }
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+<div class="w-full max-w-sm bg-slate-900/80 backdrop-blur rounded-xl border border-slate-700 p-8 shadow-2xl">
+    <div class="text-center mb-6">
+        <div class="text-4xl mb-2">📦</div>
+        <h1 class="text-xl font-bold text-sky-400">Inventory System</h1>
+        <p class="text-xs text-slate-500 mt-1">نظام إدارة المخزون</p>
+    </div>
+    <form id="login-form" onsubmit="return doLogin(event)">
+        <div class="mb-4">
+            <label class="block text-xs text-slate-400 mb-1">Username / اسم المستخدم</label>
+            <input id="username" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500" required autocomplete="username">
+        </div>
+        <div class="mb-6">
+            <label class="block text-xs text-slate-400 mb-1">Password / كلمة المرور</label>
+            <div class="relative">
+                <input id="password" type="password" class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2.5 pr-10 text-white text-sm focus:outline-none focus:border-sky-500" required autocomplete="current-password">
+                <button type="button" onclick="togglePassword('password', this)" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white text-sm">👁️</button>
+            </div>
+        </div>
+        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded text-sm transition">Login / تسجيل الدخول</button>
+        <p id="login-error" class="text-red-400 text-xs text-center mt-3 hidden"></p>
+    </form>
+</div>
+<script>
+    function togglePassword(fieldId, btn) {
+        const f = document.getElementById(fieldId);
+        if (f.type === 'password') { f.type = 'text'; btn.textContent = '🙈'; }
+        else { f.type = 'password'; btn.textContent = '👁️'; }
+    }
+    const nextUrl = new URLSearchParams(window.location.search).get('next') || '/branches/';
+    async function doLogin(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true;
+        btn.textContent = 'Logging in...';
+        const errEl = document.getElementById('login-error');
+        errEl.classList.add('hidden');
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: document.getElementById('username').value, password: document.getElementById('password').value})
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                errEl.textContent = err.detail || 'Login failed';
+                errEl.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Login / تسجيل الدخول';
+                return false;
+            }
+            const data = await res.json();
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('role', data.role || 'editor');
+            window.location.href = nextUrl;
+        } catch(e) {
+            errEl.textContent = 'Connection error';
+            errEl.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Login / تسجيل الدخول';
+        }
+        return false;
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inventory-system"
+version = "2.0.0"
+description = "Bilingual cement inventory management with distribution tracking, alerts, and charts"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "jinja2",
+    "python-jose",
+    "passlib",
+    "bcrypt==4.0.1",
+    "python-dotenv",
+]
+
+[project.scripts]
+inventory = "inventory_app:start"
+
+[tool.setuptools.packages.find]
+include = ["inventory_app*"]
+
+[tool.setuptools.package-data]
+inventory_app = ["templates/*.html", "static/*"]

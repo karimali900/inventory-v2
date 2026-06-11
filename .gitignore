@@ -1,0 +1,13 @@
+*.db
+*.db-wal
+*.db-shm
+.env
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.nogitignore
+*.pdf
+.DS_Store
+nohup.out

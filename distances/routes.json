@@ -1,0 +1,11 @@
+[
+  {"from": "بياض العرب", "to": "المنيا", "distance_km": 45, "time_min": 40},
+  {"from": "بياض العرب", "to": "بني سويف", "distance_km": 110, "time_min": 100},
+  {"from": "بياض العرب", "to": "الفيوم", "distance_km": 150, "time_min": 140},
+  {"from": "بياض العرب", "to": "القاهرة", "distance_km": 220, "time_min": 200},
+  {"from": "بياض العرب", "to": "الإسكندرية", "distance_km": 350, "time_min": 320},
+  {"from": "بياض العرب", "to": "طنطا", "distance_km": 280, "time_min": 260},
+  {"from": "بياض العرب", "to": "المحلة", "distance_km": 300, "time_min": 280},
+  {"from": "بياض العرب", "to": "دمياط", "distance_km": 380, "time_min": 360},
+  {"from": "بياض العرب", "to": "بورسعيد", "distance_km": 400, "time_min": 380}
+]

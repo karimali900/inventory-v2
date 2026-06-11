@@ -1,0 +1,2 @@
+recursive-include inventory_app/templates *.html
+recursive-include inventory_app/static *

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Select Branch — Inventory System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    body { background: #0f172a; color: #e2e8f0; font-family: monospace; background-image: url('/static/bg.jpg'); background-size: cover; background-attachment: fixed; background-position: center; background-blend-mode: overlay; }
+    .card { background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; backdrop-filter: blur(10px); }
+    .card:hover { border-color: #38bdf8; transform: translateY(-2px); }
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+<div class="w-full max-w-2xl">
+    <div class="text-center mb-8">
+        <div class="text-5xl mb-3">📦</div>
+        <h1 class="text-2xl font-bold text-sky-400">Inventory System</h1>
+        <p class="text-slate-400 text-sm mt-1">نظام إدارة المخزون</p>
+    </div>
+    <div class="text-center mb-6">
+        <p class="text-slate-300 text-lg" style="direction:rtl">اختر الفرع</p>
+        <p class="text-slate-500 text-xs">Select Branch</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <a href="/alex/" class="card rounded-xl p-8 text-center transition block hover:shadow-xl">
+            <div class="text-5xl mb-4">⚓</div>
+            <h2 class="text-xl font-bold text-emerald-400 mb-1">Alexandria</h2>
+            <p class="text-slate-400 text-sm">الاسكندرية</p>
+        </a>
+        <a href="/bani/" class="card rounded-xl p-8 text-center transition block hover:shadow-xl">
+            <div class="text-5xl mb-4">🏭</div>
+            <h2 class="text-xl font-bold text-sky-400 mb-1">Bani Suwayf</h2>
+            <p class="text-slate-400 text-sm">بنى سويف</p>
+        </a>
+    </div>
+</div>
+<script>
+    if (!localStorage.getItem('token')) {
+        window.location.href = '/login?next=' + encodeURIComponent('/branches/');
+    }
+</script>
+</body>
+</html>

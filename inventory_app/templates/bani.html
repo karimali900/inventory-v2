@@ -1,0 +1,2341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="pageTitle">Inventory Balance Movement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background: #0f172a; color: #e2e8f0; font-family: monospace; background-image: url('/static/bg.jpg'); background-size: cover; background-attachment: fixed; background-position: center; background-blend-mode: overlay; }
+        .glass { background: rgba(15, 23, 42, 0.8); border: 1px solid #334155; backdrop-filter: blur(10px); }
+        .modal-overlay { background: rgba(0,0,0,0.6); }
+        .warning-glow { box-shadow: 0 0 12px rgba(234,179,8,0.3); border-color: #eab308; }
+        .danger-glow { box-shadow: 0 0 12px rgba(239,68,68,0.3); border-color: #ef4444; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        [data-role-gate] { display: none; }
+        @media print {
+            body { background: white; color: black; font-size: 14px !important; }
+            .glass { background: white; border-color: #ccc; }
+            #create-modal, #detail-modal, #new-item-btn, #lang-btn, .tab-buttons,
+            #tab-main-inventory, #tab-main-reports, #tab-main-gps, #tab-main-accounts, .print-hide { display: none !important; }
+            #print-btn, #send-report-btn, .bg-rose-700, .bg-amber-600 { display: none !important; }
+            .flex-wrap .bg-sky-700 { display: none !important; }
+            .flex-wrap .text-xs { display: none !important; }
+            canvas { max-height: 300px !important; }
+            #stock-table, #report-table, #accounts-table { font-size: 14px !important; }
+            #stock-table th, #stock-table td,
+            #report-table th, #report-table td,
+            #accounts-table th, #accounts-table td { color: black !important; padding: 10px 12px !important; font-size: 14px !important; }
+            #stock-table th, #report-table th, #accounts-table th { border-bottom-color: #999 !important; }
+            #stock-table tr, #report-table tr, #accounts-table tr { border-bottom-color: #ddd !important; }
+            h1, h2, h3 { color: #b45309 !important; font-size: 1.5em !important; }
+            .text-amber-400 { color: #b45309 !important; }
+            .text-sky-400 { color: #0369a1 !important; }
+            .text-emerald-400 { color: #047857 !important; }
+            .text-slate-400 { color: #666 !important; }
+            .glass .p-4 h3 { font-size: 1.2em !important; }
+            .glass .p-4 .text-xs { font-size: 13px !important; }
+            .items-grid .glass { font-size: 14px !important; }
+            .items-grid .glass .text-2xl { font-size: 2em !important; }
+            .items-grid .glass .text-xs { font-size: 12px !important; }
+            #tab-accounts-content { display: block !important; }
+            #tab-gps-content { display: none !important; }
+            #recipients-list { display: none !important; }
+            .bg-amber-900\/40 { background: #fef3c7 !important; border-color: #d97706 !important; color: #92400e !important; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen" style="padding-top: 4vh;">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-2xl md:text-3xl font-bold text-amber-400" data-i18n="title">Inventory Balance Movement</h1>
+                    <span class="text-xs px-3 py-1 rounded-full bg-amber-900/40 text-amber-300 border border-amber-700 font-bold" data-i18n="branchLabel">Bani Suwayf</span>
+                </div>
+                <p class="text-slate-300 text-sm mt-1" data-i18n="subtitle">Stock management &amp; auto-warning system</p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="toggleLang()" id="lang-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm font-bold transition">عربي</button>
+                <button onclick="logout()" class="bg-rose-700 hover:bg-rose-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="logout">🚪 Logout</button>
+            </div>
+        </div>
+
+        <div class="flex gap-2 border-b border-slate-700 mb-4">
+            <button onclick="switchMainTab('inventory')" id="tab-main-inventory" class="px-3 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition" data-i18n="inventory">📦 Inventory</button>
+            <button onclick="switchMainTab('history')" id="tab-main-history" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="history">📜 History</button>
+            <button onclick="switchMainTab('orders')" id="tab-main-orders" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="orders">📋 Orders</button>
+            <button onclick="switchMainTab('accounts')" id="tab-main-accounts" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="accounts">💰 Station Accounts</button>
+            <button onclick="switchMainTab('reports')" id="tab-main-reports" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="reports">📊 Reports</button>
+            <button onclick="switchMainTab('contacts')" id="tab-main-contacts" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="contacts">📞 Contacts</button>
+            <button onclick="switchMainTab('gps')" id="tab-main-gps" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="gps">🛰️ GPS</button>
+            <button onclick="switchMainTab('cement-news')" id="tab-main-cement-news" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="cementNews">🏭 Cement News</button>
+            <button onclick="switchMainTab('ostool')" id="tab-main-ostool" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="ostool">🚛 Ostool Operation</button>
+            <button onclick="switchMainTab('users')" id="tab-main-users" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="users" style="display:none">👥 Users</button>
+        </div>
+
+        <div id="tab-inventory-content">
+            <div class="flex flex-wrap gap-2 mb-4">
+                <select id="item-select" onchange="itemSelectChanged(this.value)" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm border border-slate-600 focus:outline-none focus:border-emerald-500">
+                    <option value="" data-i18n="selectType">— Select Type / اختار النوع —</option>
+                </select>
+                <button onclick="openCreateModal()" id="new-item-btn" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="newItem">Add New Item</button>
+                <span class="text-xs text-slate-500 self-center mr-2" data-i18n="quickHint">(إضافة سريعة)</span>
+            </div>
+
+            <div id="summary-bar" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4"></div>
+
+            <div id="alerts-bar" class="hidden mb-4"></div>
+
+            <div id="items-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        </div>
+
+        <div id="tab-history-content" class="hidden">
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="text-sm font-bold text-amber-400" data-i18n="globalHistory">Global Transaction History</h3>
+                    <button onclick="loadHistory(0)" id="history-refresh" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs font-bold transition">🔄 <span data-i18n="refresh">Refresh</span></button>
+                </div>
+                <div id="dist-stats" class="grid grid-cols-3 gap-2 mb-3"></div>
+                <div id="history-list" class="space-y-1 max-h-[60vh] overflow-y-auto scrollbar-hide"></div>
+                <div id="history-pagination" class="flex justify-between items-center mt-3 text-xs text-slate-400"></div>
+            </div>
+        </div>
+
+        <div id="tab-reports-content" class="hidden">
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input id="report-date" type="date" onchange="loadReport()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500">
+                <button onclick="printReport()" id="print-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm font-bold transition">🖨️ <span data-i18n="printReport">Print Report</span></button>
+                <button onclick="exportCSV()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition">📥 <span data-i18n="exportCSV">Export CSV</span></button>
+                <button onclick="loadReport()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm font-bold transition">🔄 <span data-i18n="refresh">Refresh</span></button>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
+                <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="emailRecipients">📧 Email Recipients</h3>
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <input id="new-email-input" type="email" class="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" data-i18n-placeholder="emailPlaceholder" placeholder="email@example.com">
+                    <button onclick="addRecipient()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="addEmail">Add</button>
+                    <button onclick="sendAlertReport()" id="send-report-btn" class="bg-rose-700 hover:bg-rose-600 text-white px-4 py-2 rounded text-sm font-bold transition">📧 <span data-i18n="sendReport">Send Report</span></button>
+                </div>
+                <div id="recipients-list" class="text-xs text-slate-400"></div>
+            </div>
+
+            <div id="report-content">
+                <div class="text-slate-500 text-center py-8" data-i18n="loadingReport">Loading report data...</div>
+            </div>
+        </div>
+
+        <div id="tab-gps-content" class="hidden">
+            <div class="glass rounded-xl p-8 border border-slate-600 text-center">
+                <div class="text-6xl mb-4">🛰️</div>
+                <h3 class="text-lg font-bold text-amber-400 mb-4" data-i18n="gps">🛰️ GPS Tracker</h3>
+                <p class="text-slate-400 text-sm mb-6">Click the button below to open the Altair GPS tracking system in a new tab.</p>
+                <a href="https://altair.ostool-eg.com/" target="_blank" rel="noopener noreferrer" class="inline-block bg-amber-600 hover:bg-amber-500 text-white px-6 py-3 rounded-lg text-sm font-bold transition">🔗 <span data-i18n="gps">🛰️ GPS Tracker</span></a>
+            </div>
+        </div>
+
+        <div id="tab-accounts-content" class="hidden">
+            <div class="flex flex-wrap gap-2 mb-4 items-center">
+                <h3 class="text-sm font-bold text-amber-400" style="margin:0;" data-i18n="accounts">💰 Station Accounts</h3>
+                <input id="accounts-date" type="date" class="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white text-sm" style="margin-left:auto;">
+                <button onclick="loadStationAccounts()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-sm font-bold transition" data-i18n="accLoad">🔄 Load</button>
+                <button onclick="printAccounts()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded text-sm font-bold transition" data-i18n="printAccounts">🖨️ Print</button>
+            </div>
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <div style="overflow-x:auto;">
+                    <table class="w-full text-sm text-left" id="accounts-table">
+                        <thead><tr class="text-slate-400 border-b border-slate-700">
+                            <th class="py-2 px-3" data-i18n="accountsStation">Station</th>
+                            <th class="py-2 px-3" data-i18n="accountsItem">Item</th>
+                            <th class="py-2 px-3 text-right" data-i18n="accountsWeight">Weight (tons)</th>
+                            <th class="py-2 px-3 text-right" data-i18n="accountsPrice">Price/Ton (EGP)</th>
+                            <th class="py-2 px-3 text-right" data-i18n="accountsRevenue">Revenue (EGP)</th>
+                        </tr></thead>
+                        <tbody id="accounts-body"></tbody>
+                        <tfoot id="accounts-foot" class="border-t border-slate-700"></tfoot>
+                    </table>
+                </div>
+                <p id="accounts-empty" class="text-slate-500 text-center py-8 text-sm" style="display:none;" data-i18n="accountsNoData">No completed distributions for this date.</p>
+            </div>
+        </div>
+
+        <div id="tab-orders-content" class="hidden">
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
+                <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="newOrder">📋 New Customer Order</h3>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    <input id="order-customer" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderCustomer" placeholder="Customer Name">
+                    <input id="order-phone" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" placeholder="Phone">
+                    <input id="order-item" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderItem" placeholder="Item">
+                    <input id="order-qty" type="number" step="0.01" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderQty" placeholder="Quantity (ton)">
+                    <button onclick="createOrder()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="addOrder">➕ Add Order</button>
+                </div>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
+                <h3 class="text-sm font-bold text-emerald-400 mb-3" data-i18n="acceptedOrders">✅ Accepted Orders</h3>
+                <div id="accepted-orders-list" class="text-xs text-slate-400">Loading...</div>
+            </div>
+
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="pendingOrders">⏳ Pending & Refused Orders</h3>
+                <div id="pending-orders-list" class="text-xs text-slate-400">Loading...</div>
+            </div>
+        </div>
+
+        <div id="tab-cement-news-content" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <a href="https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://cementegypt.com/&ved=2ahUKEwjx4sKXlP-UAxVRTqQEHX0QEIkQFnoECBQQAQ&usg=AOvVaw0w0NkCMY0_dfkrt7CPDkRL" target="_blank" class="text-sm font-bold text-amber-400 hover:text-emerald-400 transition" data-i18n="cementNews">🏭 CEMENT NEWS</a>
+                <span id="news-timestamp" class="text-xs text-slate-500"></span>
+            </div>
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <div id="cement-news-list" class="text-xs text-slate-400">Loading...</div>
+            </div>
+        </div>
+
+        <div id="tab-contacts-content" class="hidden">
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
+                <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="newContact">📞 New Contact</h3>
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-2">
+                    <input id="contact-name" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="contactName" placeholder="Name">
+                    <input id="contact-phone" type="tel" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="contactPhone" placeholder="Phone">
+                    <label class="flex items-center gap-2 text-xs text-slate-400"><input id="contact-whatsapp" type="checkbox" class="rounded border-slate-600"> <span data-i18n="hasWhatsapp">WhatsApp</span></label>
+                    <input id="contact-notes" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="contactNotes" placeholder="Notes">
+                    <button onclick="addContact()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="addContact">➕ Add</button>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="contactsList">📋 Contacts List</h3>
+                <div id="contacts-list" class="text-xs text-slate-400">Loading...</div>
+            </div>
+        </div>
+
+        <div id="tab-ostool-content" class="hidden">
+            <div class="flex flex-wrap gap-2 mb-4 items-center">
+                <select id="ostool-station-filter" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm">
+                    <option value="" data-i18n="allStations">All Stations</option>
+                </select>
+                <input id="ostool-date" type="date" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                <input id="ostool-emails" list="ostool-email-list" autocomplete="email" placeholder="dtitan@ostool-eg.com" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-emerald-500" onchange="localStorage.setItem('ostool_emails', this.value)">
+                <datalist id="ostool-email-list"></datalist>
+                <button onclick="sendOstoolEmail()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="ostoolEmail">📧 Email to Ostool</button>
+                <button onclick="printOstool()" id="print-ostool-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="printOstool">🖨️ Print</button>
+            </div>
+            <div class="flex flex-wrap gap-2 mb-4 items-start">
+                <textarea id="ostool-general-note" rows="2" placeholder="ملاحظات عامة للإيميل..." class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-rose-500 resize-none text-xs" oninput="localStorage.setItem('ostool_general_note', this.value)"></textarea>
+                <button onclick="document.getElementById('ostool-general-note').value='';localStorage.removeItem('ostool_general_note')" class="bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded text-xs font-bold transition self-end" data-i18n="delete">🗑️ Delete</button>
+            </div>
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <div id="ostool-content" class="text-xs text-slate-400">Loading...</div>
+            </div>
+        </div>
+
+        <!-- 👥 Users Section -->
+        <div id="tab-users-content" class="hidden">
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-6">
+                <h3 class="text-sm font-bold text-emerald-400 mb-3" data-i18n="manageUsers">👥 Manage Users</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm mb-4" id="users-table">
+                        <thead><tr class="text-slate-400 border-b border-slate-700">
+                            <th class="py-2 px-2 text-left">#</th>
+                            <th class="py-2 px-2 text-left" data-i18n="username">Username</th>
+                            <th class="py-2 px-2 text-left" data-i18n="role">Role</th>
+                            <th class="py-2 px-2 text-left" data-i18n="created">Created</th>
+                            <th class="py-2 px-2 text-left" data-i18n="actions">Actions</th>
+                        </tr></thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
+                </div>
+                <button onclick="openAddUserModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="addUser">➕ Add User</button>
+            </div>
+        </div>
+
+        <datalist id="global-suggest"></datalist>
+
+        <!-- Add User Modal -->
+        <div id="add-user-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+            <div class="glass rounded-xl p-6 w-full max-w-sm border border-slate-600">
+                <h2 class="text-lg font-bold text-emerald-400 mb-4" data-i18n="addUser">➕ Add User</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="username">Username</label>
+                        <input id="new-username" pattern="[A-Za-z0-9_]+" title="English letters, numbers, and underscore only" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="password">Password</label>
+                        <div class="relative">
+                            <input id="new-password" type="password" pattern="[A-Za-z0-9_!@#$%^&*]+" title="English characters only" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 pr-10 text-white text-sm focus:outline-none focus:border-emerald-500">
+                            <button type="button" onclick="togglePassword('new-password', this)" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white text-sm">👁️</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="role">Role</label>
+                        <select id="new-role" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="editor" data-i18n="editor">Editor</option>
+                            <option value="viewer" data-i18n="viewer">Viewer</option>
+                            <option value="admin" data-i18n="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-5 justify-end">
+                    <button onclick="closeAddUserModal()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button onclick="confirmAddUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="save">💾 Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit User Modal -->
+        <div id="edit-user-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+            <div class="glass rounded-xl p-6 w-full max-w-sm border border-slate-600">
+                <h2 class="text-lg font-bold text-amber-400 mb-4" data-i18n="editUser">✏️ Edit User</h2>
+                <div class="space-y-3">
+                    <input id="edit-user-id" type="hidden">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="username">Username</label>
+                        <input id="edit-username" disabled class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-slate-400 text-sm">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="role">Role</label>
+                        <select id="edit-role" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500">
+                            <option value="editor">Editor</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="newPassword">New Password (leave blank to keep)</label>
+                        <div class="relative">
+                            <input id="edit-password" type="password" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 pr-10 text-white text-sm focus:outline-none focus:border-amber-500">
+                            <button type="button" onclick="togglePassword('edit-password', this)" class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white text-sm">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-5 justify-end">
+                    <button onclick="closeEditUserModal()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm transition" data-i18n="cancel">Cancel</button>
+                    <button onclick="confirmEditUser()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="save">💾 Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🔍 Search Section -->
+        <div class="glass rounded-xl p-4 border border-slate-600 mb-6">
+            <div class="flex flex-wrap gap-2 mb-3">
+                <button onclick="switchSearchMode('files')" id="search-mode-files" class="px-3 py-1.5 text-xs font-bold rounded border-b-2 border-amber-400 text-amber-400 transition" data-i18n="searchFiles">📁 Internal Search</button>
+                <button onclick="switchSearchMode('maps')" id="search-mode-maps" class="px-3 py-1.5 text-xs font-bold rounded border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="searchMaps">🗺️ Google Maps</button>
+                <button onclick="switchSearchMode('app')" id="search-mode-app" class="px-3 py-1.5 text-xs font-bold rounded border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="searchApp">🔎 Search App</button>
+            </div>
+
+            <div id="search-panel-files">
+                <div class="flex gap-2">
+                    <input id="search-files-input" type="text" oninput="searchDistancesFiles()" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" data-i18n-placeholder="searchFilesPlaceholder" placeholder="Search distances...">
+                    <button onclick="document.getElementById('search-files-input').value=''; searchDistancesFiles()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm transition">✕</button>
+                </div>
+                <div id="search-files-results" class="mt-2 space-y-1 text-xs text-slate-400"></div>
+            </div>
+
+            <div id="search-panel-maps" class="hidden">
+                <div class="flex flex-wrap gap-2 items-end">
+                    <div class="flex-1 min-w-[120px]">
+                        <label class="text-xs text-slate-500 block mb-1" data-i18n="mapsFrom">From</label>
+                        <input id="maps-from" value="بياض العرب" readonly class="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-sm opacity-70">
+                    </div>
+                    <div class="flex-1 min-w-[120px]">
+                        <label class="text-xs text-slate-500 block mb-1" data-i18n="mapsTo">To</label>
+                        <input id="maps-to" type="text" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" data-i18n-placeholder="mapsToPlaceholder" placeholder="Enter destination...">
+                    </div>
+                    <button onclick="openGoogleMaps()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="searchMapsBtn">🗺️ Open Maps</button>
+                </div>
+            </div>
+
+            <div id="search-panel-app" class="hidden">
+                <div class="flex gap-2">
+                    <input id="station-search" type="text" oninput="searchStations()" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" data-i18n-placeholder="stationSearch" placeholder="Search station...">
+                    <button onclick="document.getElementById('station-search').value=''; searchStations()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-sm transition">✕</button>
+                </div>
+                <div id="station-results" class="hidden mt-2 space-y-1"></div>
+            </div>
+        </div>
+
+        <div style="text-align:center; padding:8px 0; margin-top:12px; font-size:12px; color:#d97706; font-weight:bold;">created by @KARIM</div>
+
+    <div id="create-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="glass rounded-xl p-6 w-full max-w-md border border-slate-600">
+            <h2 class="text-lg font-bold text-amber-400 mb-4" data-i18n="createTitle">New Inventory Item</h2>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="itemName">Item Name</label>
+                    <input id="create-name" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" data-i18n-placeholder="itemNamePlaceholder">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="description">Description</label>
+                    <input id="create-desc" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" data-i18n-placeholder="optionalPlaceholder">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="beginningStock">Beginning Stock</label>
+                    <input id="create-stock" type="number" step="any" value="0" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">
+                        <span data-i18n="warningThreshold">Warning Threshold</span>
+                        <span class="text-slate-500" data-i18n="thresholdHint">(stock below this triggers alert)</span>
+                    </label>
+                    <input id="create-threshold" type="number" step="any" value="10" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-5 justify-end">
+                <button onclick="closeCreateModal()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm transition" data-i18n="cancel">Cancel</button>
+                <button onclick="createItem()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="create">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="detail-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="glass rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-slate-600 scrollbar-hide">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 id="detail-name" class="text-lg font-bold text-amber-400"></h2>
+                    <p id="detail-desc" class="text-slate-400 text-xs mt-1"></p>
+                </div>
+                <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <div class="bg-slate-900/50 rounded p-3 text-center">
+                    <span class="text-xs text-slate-400 block" data-i18n="currentStock">Current Stock</span>
+                    <span id="detail-stock" class="text-xl font-bold text-white"></span>
+                </div>
+                <div class="bg-slate-900/50 rounded p-3 text-center">
+                    <span class="text-xs text-slate-400 block" data-i18n="threshold">Threshold</span>
+                    <span id="detail-threshold" class="text-xl font-bold text-yellow-400"></span>
+                </div>
+                <div class="bg-slate-900/50 rounded p-3 text-center">
+                    <span class="text-xs text-slate-400 block" data-i18n="status">Status</span>
+                    <span id="detail-status" class="text-xl font-bold"></span>
+                </div>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <button onclick="openStockModal('add')" id="btn-add-stock" class="flex-1 bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition">+ Add Stock</button>
+                <button onclick="openDistributeModal()" id="btn-distribute" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded text-sm font-bold transition">Distribute</button>
+                <button onclick="openThresholdModal()" id="btn-threshold" class="bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 rounded text-sm font-bold transition">Threshold</button>
+                <button onclick="deleteItem()" id="btn-delete" class="bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-bold transition">🗑️</button>
+            </div>
+
+            <div class="flex border-b border-slate-700 mb-3">
+                <button onclick="switchDetailTab('transactions')" id="tab-tx" class="px-3 py-2 text-xs font-bold border-b-2 border-amber-400 text-amber-400 transition">Transaction History</button>
+                <button onclick="switchDetailTab('distributions')" id="tab-dist" class="px-3 py-2 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition">Distributions</button>
+            </div>
+
+            <div id="detail-transactions" class="space-y-1 max-h-60 overflow-y-auto scrollbar-hide"></div>
+            <div id="detail-distributions" class="space-y-1 max-h-60 overflow-y-auto scrollbar-hide hidden"></div>
+        </div>
+    </div>
+
+    <div id="stock-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="glass rounded-xl p-6 w-full max-w-sm border border-slate-600">
+            <h2 id="stock-modal-title" class="text-lg font-bold mb-4"></h2>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="quantity">Quantity</label>
+                    <input id="stock-qty" type="number" step="any" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="note">Note (optional)</label>
+                    <input id="stock-note" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-5 justify-end">
+                <button onclick="closeStockModal()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm transition" data-i18n="cancel">Cancel</button>
+                <button id="stock-confirm-btn" onclick="confirmStockAction()" class="text-white px-4 py-2 rounded text-sm font-bold transition"></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="distribute-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="glass rounded-xl p-6 w-full max-w-sm border border-slate-600">
+            <h2 class="text-lg font-bold text-purple-400 mb-4" data-i18n="distributeTitle">Distribute to Station</h2>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="station">Station</label>
+                    <input id="dist-station" list="global-suggest" required class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500" data-i18n-placeholder="stationPlaceholder">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="weight">Weight (tons)</label>
+                    <input id="dist-weight" required type="number" step="any" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="transportCompany">Transportation Company</label>
+                    <input id="dist-transport" list="global-suggest" required class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500" data-i18n-placeholder="transportPlaceholder">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="driverName">Driver Name</label>
+                    <input id="dist-driver" list="global-suggest" required class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="truckNumber">Truck Number</label>
+                    <input id="dist-truck" list="global-suggest" required class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="remarks">Remarks (optional)</label>
+                    <textarea id="dist-remarks" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"></textarea>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-5 justify-end">
+                <button onclick="closeDistributeModal()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm transition" data-i18n="cancel">Cancel</button>
+                <button onclick="confirmDistribute()" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="distributeBtn">Distribute</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="threshold-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="glass rounded-xl p-6 w-full max-w-sm border border-slate-600">
+            <h2 class="text-lg font-bold text-yellow-400 mb-4" data-i18n="editThreshold">Edit Warning Threshold</h2>
+            <div>
+                <label class="text-xs text-slate-400 block mb-1" data-i18n="newThreshold">New Threshold</label>
+                <input id="threshold-val" type="number" step="any" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-yellow-500">
+            </div>
+            <div class="flex gap-3 mt-5 justify-end">
+                <button onclick="closeThresholdModal()" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm transition" data-i18n="cancel">Cancel</button>
+                <button onclick="confirmThreshold()" class="bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const LANG_KEY = 'inventory_lang';
+        let currentLang = localStorage.getItem(LANG_KEY) || 'en';
+        const ROLE = localStorage.getItem('role') || 'viewer';
+        function hasRole(...roles) { return roles.includes(ROLE); }
+        function applyRoleGates() {
+            document.querySelectorAll('[data-role-gate]').forEach(el => {
+                if (hasRole(...el.getAttribute('data-role-gate').split(','))) el.style.display = '';
+            });
+        }
+
+        const i18n = {
+            en: {
+                pageTitle: 'حركة مخزون اسمنت بنى سويف | Inventory Balance Movement',
+                title: 'Inventory Balance Movement',
+                subtitle: 'Stock management & auto-warning system',
+                langBtn: 'عربي',
+                branchLabel: 'Bani Suwayf',
+                selectType: '— Select Type —',
+                logout: '🚪 Logout',
+                newItem: 'Add New Item',
+                createTitle: 'New Inventory Item',
+                itemName: 'Item Name',
+                itemNamePlaceholder: 'e.g. Cement bags',
+                description: 'Description',
+                optionalPlaceholder: 'Optional',
+                beginningStock: 'Beginning Stock',
+                warningThreshold: 'Warning Threshold',
+                thresholdHint: '(stock below this triggers alert)',
+                cancel: 'Cancel',
+                create: 'Create',
+                currentStock: 'Current Stock',
+                threshold: 'Threshold',
+                status: 'Status',
+                addStock: '+ Add Stock',
+                distribute: 'Distribute',
+                editThreshold: 'Edit Warning Threshold',
+                newThreshold: 'New Threshold',
+                save: 'Save',
+                quantity: 'Quantity',
+                note: 'Note (optional)',
+                txHistory: 'Transaction History',
+                distHistory: 'Distributions',
+                noItems: 'No items yet. Click "New Item" to begin.',
+                out: 'OUT',
+                low: 'LOW',
+                ok: 'OK',
+                units: 'ton',
+                noDesc: 'No description',
+                noTx: 'No transactions yet',
+                stockLabel: 'Stock',
+                view: 'View',
+                alertTitle: 'ALERTS',
+                addTitle: 'Add Stock',
+                addBtn: 'Add',
+                reqName: 'Item name is required',
+                reqQty: 'Enter a valid positive quantity',
+                reqThreshold: 'Enter a valid threshold',
+                error: 'Error',
+                beginningInventory: 'Beginning inventory',
+                distributeTitle: 'Distribute to Station',
+                station: 'Station',
+                stationPlaceholder: 'e.g. North Station',
+                weight: 'Weight (tons)',
+                distributeBtn: 'Distribute',
+                reqStation: 'Station name is required',
+                reqWeight: 'Enter a valid positive weight',
+                reqTransportCompany: 'Transportation company name is required',
+                reqDriverName: 'Driver name is required',
+                reqTruckNumber: 'Truck number is required',
+                distTo: 'Distribution to',
+                noDist: 'No distributions yet',
+                quickOrdinary: 'Normal Cement',
+                quickHint: '(Quick-add)',
+                pending: 'Pending',
+                completed: 'Done',
+                delete: '🗑️ Delete',
+                inventory: '📦 Inventory',
+                reports: '📊 Reports',
+                deleteConfirm: 'Archive this item? It will be hidden from the list but can be restored.',
+                printReport: 'Print Report',
+                refresh: 'Refresh',
+                loadingReport: 'Loading report data',
+                stockLevels: 'Stock Levels',
+                distByStation: 'Distributions by Station',
+                stockVsThreshold: 'Stock vs Threshold',
+                recentDist: 'Recent Distributions',
+                stockSummary: 'Stock Summary',
+                date: 'Date',
+                item: 'Item',
+                currentStock: 'Current Stock',
+                threshold: 'Threshold',
+                status: 'Status',
+                history: '📜 History',
+                globalHistory: 'Global Transaction History',
+                totalItems: 'Total Items',
+                totalStock: 'Total Stock',
+                lowItems: 'Low Items',
+                outItems: 'Out of Stock',
+                searchPlaceholder: 'Search items...',
+                stationSearch: 'Search station...',
+                noResults: 'No results',
+                totalWeight: 'Total Weight',
+                stations: 'Stations',
+                exportCSV: 'Export CSV',
+                sendReport: 'Send Report',
+                sendReportConfirm: 'Send inventory report via email?',
+                reportSent: 'Report sent successfully!',
+                reportFailed: 'Failed to send report:',
+                gps: '🛰️ GPS Tracker',
+                accounts: '💰 Station Accounts',
+                accountsStation: 'Station',
+                accountsItem: 'Item',
+                accountsWeight: 'Weight (tons)',
+                accountsPrice: 'Price/Ton (EGP)',
+                accountsRevenue: 'Revenue (EGP)',
+                accountsTotalWeight: 'Total Weight',
+                accountsTotalRevenue: 'Total Revenue',
+                accountsNoData: 'No completed distributions for this date.',
+                accLoad: 'Load',
+                accRefresh: '🔄 Refresh',
+                printAccounts: '🖨️ Print',
+                accountsPrint: 'طباعة كشف الحسابات',
+                emailRecipients: 'Email Recipients',
+                addEmail: 'Add',
+                emailPlaceholder: 'email@example.com',
+                deleteEmail: '✕',
+                noRecipients: 'No recipients yet. Add one above.',
+                orders: '📋 Orders',
+                newOrder: '📋 New Customer Order',
+                orderCustomer: 'Customer Name',
+                orderItem: 'Item',
+                orderQty: 'Quantity (ton)',
+                addOrder: '➕ Add Order',
+                acceptedOrders: '✅ Accepted Orders',
+                pendingOrders: '⏳ Pending & Refused Orders',
+                accept: '✅ Accept',
+                refuse: '❌ Refuse',
+                refusalReason: 'Reason for refusal',
+                refuseConfirm: 'Refuse this order?',
+                noAccepted: 'No accepted orders yet.',
+                noPending: 'No pending orders.',
+                cementNews: '🏭 CEMENT NEWS',
+                contacts: '📞 Contacts & Drivers',
+                newContact: '📞 New Contact',
+                contactName: 'Name',
+                contactPhone: 'Phone',
+                hasWhatsapp: 'WhatsApp',
+                contactNotes: 'Notes',
+                addContact: '➕ Add',
+                contactsList: '📋 Contacts List',
+                callContact: '📞 Call',
+                whatsappContact: '💬 WhatsApp',
+                pendingContact: '⏳ Pending',
+                contactStatus: 'Status',
+                deleteContact: '✕',
+                noContacts: 'No contacts yet.',
+                newsError: 'Failed to fetch prices.',
+                newsUpdated: 'Updated',
+                ostool: '🚛 Ostool Operation',
+                transportCompany: 'Transportation Company',
+                transportPlaceholder: 'e.g. Ostool Transport',
+                driverName: 'Driver Name',
+                truckNumber: 'Truck Number',
+                remarks: 'Remarks',
+                ostoolEmail: '📧 Email to Ostool',
+                printOstool: '🖨️ Print',
+                ostoolTotalOps: 'Total Operations',
+                ostoolTotalWeight: 'Total Weight',
+                ostoolOps: 'Operations',
+                ostoolCompleted: 'Completed',
+                stations: 'Stations',
+                lastOp: 'Last Operation',
+                noOstool: 'No Ostool operations found.',
+                ostoolEmailSent: 'Ostool report sent via email',
+                allStations: 'All Stations',
+                searchFiles: '📁 Internal Search',
+                searchMaps: '🗺️ Google Maps',
+                searchApp: '🔎 Search App',
+                searchFilesPlaceholder: 'Search distances...',
+                mapsFrom: 'From',
+                mapsTo: 'To',
+                mapsToPlaceholder: 'Enter destination...',
+                searchMapsBtn: '🗺️ Open Maps',
+                reqDestination: 'Please enter a destination',
+                sending: 'Sending',
+                users: '👥 Users',
+                manageUsers: '👥 Manage Users',
+                addUser: '➕ Add User',
+                editUser: '✏️ Edit User',
+                role: 'Role',
+                username: 'Username',
+                password: 'Password',
+                newPassword: 'New Password',
+                actions: 'Actions',
+                created: 'Created',
+                admin: 'Admin',
+                editor: 'Editor',
+                viewer: 'Viewer',
+                deleteUserConfirm: 'Delete this user?',
+                reqUserFields: 'Username and password required',
+                openingStock: 'Opening Stock',
+                todayAdditions: 'Today Adds',
+                todayDistributions: 'Today Dists',
+            },
+            ar: {
+                pageTitle: 'حركة مخزون اسمنت بنى سويف | ميزان حركة المخزون',
+                title: 'حركة المخزون وادارة الحركة',
+                subtitle: 'نظام إدارة المخزون مع إنذار تلقائي',
+                langBtn: 'English',
+                branchLabel: 'فرع بنى سويف ← المصرية العالمية للتجارة',
+                selectType: 'اختار النوع',
+                logout: '🚪 خروج',
+                newItem: 'اضافة صنف جديد',
+                createTitle: 'صنف مخزون جديد',
+                itemName: 'اسم الصنف',
+                itemNamePlaceholder: 'مثال: شكائر أسمنت',
+                description: 'الوصف',
+                optionalPlaceholder: 'اختياري',
+                beginningStock: 'المخزون الافتتاحي',
+                warningThreshold: 'حد الإنذار',
+                thresholdHint: '(المخزون أقل من هذا يطلق إنذاراً)',
+                cancel: 'إلغاء',
+                create: 'إنشاء',
+                currentStock: 'المخزون الحالي',
+                threshold: 'الحد الأدنى',
+                status: 'الحالة',
+                addStock: '+ إضافة مخزون',
+                distribute: 'توزيع',
+                editThreshold: 'تعديل حد الإنذار',
+                newThreshold: 'الحد الجديد',
+                save: 'حفظ',
+                quantity: 'الكمية',
+                note: 'ملاحظة (اختياري)',
+                txHistory: 'سجل المعاملات',
+                distHistory: 'التوزيعات',
+                noItems: 'لا توجد أصناف بعد. اضغط "صنف جديد" للبدء.',
+                out: 'نفذ',
+                low: 'منخفض',
+                ok: 'جيد',
+                units: 'طن',
+                noDesc: 'لا يوجد وصف',
+                noTx: 'لا توجد معاملات بعد',
+                stockLabel: 'المخزون',
+                view: 'عرض',
+                alertTitle: 'إنذارات',
+                addTitle: 'إضافة مخزون',
+                addBtn: 'إضافة',
+                reqName: 'اسم الصنف مطلوب',
+                reqQty: 'أدخل كمية موجبة صحيحة',
+                reqThreshold: 'أدخل حداً صحيحاً',
+                error: 'خطأ',
+                beginningInventory: 'المخزون الافتتاحي',
+                distributeTitle: 'توزيع على محطة',
+                station: 'المحطة',
+                stationPlaceholder: 'مثال: محطة الشمال',
+                weight: 'الوزن (طن)',
+                distributeBtn: 'توزيع',
+                reqStation: 'اسم المحطة مطلوب',
+                reqWeight: 'أدخل وزناً موجباً صحيحاً',
+                reqTransportCompany: 'اسم الشركة الناقلة مطلوب',
+                reqDriverName: 'اسم السائق مطلوب',
+                reqTruckNumber: 'رقم السيارة مطلوب',
+                distTo: 'توزيع إلى',
+                noDist: 'لا توجد توزيعات بعد',
+                delete: '🗑️ حذف',
+                quickOrdinary: 'أسمنت عادي',
+                quickHint: '(إضافة سريعة)',
+                pending: 'تحت التنفيذ',
+                completed: 'تم التنفيذ',
+                inventory: '📦 المخزون',
+                reports: '📊 التقارير',
+                deleteConfirm: 'أرشفة هذا العنصر؟ سيتم إخفاؤه ويمكن استعادته لاحقاً.',
+                printReport: 'طباعة التقرير',
+                refresh: 'تحديث',
+                loadingReport: 'جاري تحميل التقرير',
+                stockLevels: 'مستويات المخزون',
+                distByStation: 'التوزيعات حسب المحطة',
+                stockVsThreshold: 'المخزون مقابل الحد',
+                recentDist: 'آخر التوزيعات',
+                stockSummary: 'ملخص المخزون',
+                date: 'التاريخ',
+                item: 'الصنف',
+                currentStock: 'المخزون الحالي',
+                threshold: 'الحد الأدنى',
+                status: 'الحالة',
+                history: '📜 السجل',
+                globalHistory: 'سجل الحركات العام',
+                totalItems: 'إجمالي الأصناف',
+                totalStock: 'إجمالي المخزون',
+                lowItems: 'الصنف منخفض',
+                outItems: 'الصنف منتهى',
+                searchPlaceholder: 'بحث عن صنف...',
+                stationSearch: 'بحث عن محطة...',
+                noResults: 'لا توجد نتائج',
+                totalWeight: 'الوزن الإجمالي',
+                stations: 'المحطات',
+                exportCSV: 'تصدير CSV',
+                sendReport: 'إرسال التقرير',
+                sendReportConfirm: 'إرسال تقرير المخزون عبر البريد الإلكتروني؟',
+                reportSent: 'تم إرسال التقرير بنجاح!',
+                reportFailed: 'فشل إرسال التقرير:',
+                gps: '🛰️ تتبع سيارات اسطول',
+                accounts: '💰 حسابات المحطات',
+                accountsStation: 'المحطة',
+                accountsItem: 'الصنف',
+                accountsWeight: 'الوزن (طن)',
+                accountsPrice: 'السعر للطن (ج.م)',
+                accountsRevenue: 'المبلغ (ج.م)',
+                accountsTotalWeight: 'الوزن الإجمالي',
+                accountsTotalRevenue: 'المبلغ الإجمالي',
+                accountsNoData: 'لا توجد توزيعات مكتملة لهذا التاريخ.',
+                accLoad: 'تحميل',
+                accRefresh: '🔄 تحديث',
+                printAccounts: '🖨️ طباعة',
+                accountsPrint: 'طباعة كشف الحسابات',
+                emailRecipients: 'مستلمي البريد',
+                addEmail: 'إضافة',
+                emailPlaceholder: 'البريد الإلكتروني',
+                deleteEmail: '✕',
+                noRecipients: 'لا يوجد مستلمين بعد. أضف بريداً أعلاه.',
+                orders: '📋 الطلبات',
+                newOrder: '📋 طلب عميل جديد',
+                orderCustomer: 'اسم العميل',
+                orderItem: 'الصنف',
+                orderQty: 'الكمية (طن)',
+                addOrder: '➕ إضافة طلب',
+                acceptedOrders: '✅ الطلبات المقبولة',
+                pendingOrders: '⏳ الطلبات المعلقة والمرفوضة',
+                accept: '✅ قبول',
+                refuse: '❌ رفض',
+                refusalReason: 'سبب الرفض',
+                refuseConfirm: 'رفض هذا الطلب؟',
+                noAccepted: 'لا توجد طلبات مقبولة بعد.',
+                noPending: 'لا توجد طلبات معلقة.',
+                cementNews: '🏭 أخبار الأسمنت',
+                contacts: '📞 جهات الاتصال ومتابعة السائقين',
+                newContact: '📞 جهة اتصال جديدة',
+                contactName: 'الاسم',
+                contactPhone: 'رقم الهاتف',
+                hasWhatsapp: 'واتساب',
+                contactNotes: 'ملاحظات',
+                addContact: '➕ إضافة',
+                contactsList: '📋 قائمة جهات الاتصال ومتابعة السائقين',
+                callContact: '📞 اتصال',
+                whatsappContact: '💬 واتساب',
+                pendingContact: '⏳ معلق',
+                contactStatus: 'الحالة',
+                deleteContact: '✕',
+                noContacts: 'لا توجد جهات اتصال بعد.',
+                newsError: 'فشل في جلب الأسعار.',
+                newsUpdated: 'آخر تحديث',
+                ostool: '🚛 تشغيل اسطول',
+                transportCompany: 'الشركة الناقلة',
+                transportPlaceholder: 'مثال: اسطول نقل',
+                driverName: 'اسم السائق',
+                truckNumber: 'رقم السيارة',
+                remarks: 'ملاحظات',
+                ostoolEmail: '📧 إيميل إلى الاسطول',
+                printOstool: '🖨️ طباعة',
+                ostoolTotalOps: 'إجمالي العمليات',
+                ostoolTotalWeight: 'إجمالي الوزن',
+                ostoolOps: 'العمليات',
+                ostoolCompleted: 'منفذ',
+                stations: 'محطات',
+                lastOp: 'آخر عملية',
+                noOstool: 'لا توجد عمليات اسطول بعد.',
+                ostoolEmailSent: 'تم إرسال تقرير الاسطول عبر الإيميل',
+                allStations: 'جميع المحطات',
+                sending: 'جارٍ الإرسال',
+                searchFiles: '📁 بحث داخلي',
+                searchMaps: '🗺️ خرائط جوجل',
+                searchApp: '🔎 بحث في النظام',
+                searchFilesPlaceholder: 'ابحث في المسافات...',
+                mapsFrom: 'من',
+                mapsTo: 'إلى',
+                mapsToPlaceholder: 'أدخل الوجهة...',
+                searchMapsBtn: '🗺️ فتح الخرائط',
+                reqDestination: 'يرجى إدخال الوجهة',
+                users: '👥 المستخدمين',
+                manageUsers: '👥 إدارة المستخدمين',
+                addUser: '➕ إضافة مستخدم',
+                editUser: '✏️ تعديل مستخدم',
+                role: 'الصلاحية',
+                username: 'اسم المستخدم',
+                password: 'كلمة المرور',
+                newPassword: 'كلمة مرور جديدة (اتركه فارغاً للإبقاء)',
+                actions: 'إجراءات',
+                created: 'تاريخ الإنشاء',
+                admin: 'مدير',
+                editor: 'محرر',
+                viewer: 'مشاهد',
+                deleteUserConfirm: 'حذف هذا المستخدم؟',
+                reqUserFields: 'اسم المستخدم وكلمة المرور مطلوبان',
+                openingStock: 'المخزون الافتتاحي',
+                todayAdditions: 'الوارد اليوم',
+                todayDistributions: 'المنصرف اليوم',
+            }
+        };
+
+        function t(key) {
+            return i18n[currentLang][key] || key;
+        }
+
+        function applyTranslation() {
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            document.title = t('pageTitle');
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.dataset.i18n);
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                el.placeholder = t(el.dataset.i18nPlaceholder);
+            });
+            document.getElementById('lang-btn').textContent = t('langBtn');
+            document.getElementById('new-item-btn').textContent = t('newItem');
+
+            renderItems();
+            renderAlerts();
+        }
+
+        let items = [];
+        let selectedItemId = null;
+        const API = '{{ api_prefix }}';
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+        }
+
+        const _fetch = window.fetch;
+        window.fetch = function(u, ...a) {
+            if (typeof u === 'string' && u.startsWith('/api/') && !u.startsWith('/api/users')) u = API + u;
+            let opts = a[0] || {};
+            if (u.includes('/api/')) {
+                opts.headers = opts.headers || {};
+                opts.headers['Authorization'] = 'Bearer ' + token;
+                if (opts.body && !opts.headers['Content-Type']) {
+                    opts.headers['Content-Type'] = 'application/json';
+                }
+                a[0] = opts;
+            }
+            return _fetch(u, ...a).then(r => {
+                if (r.status === 401) {
+                    localStorage.removeItem('token');
+                    window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+                return r;
+            });
+        };
+
+        let reportData = null;
+
+        let historyOffset = 0;
+        const HISTORY_LIMIT = 50;
+
+        function switchMainTab(tab) {
+            const inv = document.getElementById('tab-inventory-content');
+            const hist = document.getElementById('tab-history-content');
+            const rep = document.getElementById('tab-reports-content');
+            const gps = document.getElementById('tab-gps-content');
+            const acc = document.getElementById('tab-accounts-content');
+            const ord = document.getElementById('tab-orders-content');
+            const cnw = document.getElementById('tab-cement-news-content');
+            const cnt = document.getElementById('tab-contacts-content');
+            const ost = document.getElementById('tab-ostool-content');
+            const usr = document.getElementById('tab-users-content');
+            const btnInv = document.getElementById('tab-main-inventory');
+            const btnHist = document.getElementById('tab-main-history');
+            const btnRep = document.getElementById('tab-main-reports');
+            const btnGps = document.getElementById('tab-main-gps');
+            const btnAcc = document.getElementById('tab-main-accounts');
+            const btnOrd = document.getElementById('tab-main-orders');
+            const btnCnw = document.getElementById('tab-main-cement-news');
+            const btnCnt = document.getElementById('tab-main-contacts');
+            const btnOst = document.getElementById('tab-main-ostool');
+            const btnUsr = document.getElementById('tab-main-users');
+            [inv, hist, rep, gps, acc, ord, cnw, cnt, ost, usr].forEach(el => el && el.classList.add('hidden'));
+            [btnInv, btnHist, btnRep, btnGps, btnAcc, btnOrd, btnCnw, btnCnt, btnOst, btnUsr].forEach(el => {
+                if (el) el.className = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition';
+            });
+            if (tab === 'inventory') {
+                inv.classList.remove('hidden');
+                btnInv.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+            } else if (tab === 'history') {
+                hist.classList.remove('hidden');
+                btnHist.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadHistory(0);
+            } else if (tab === 'gps') {
+                gps.classList.remove('hidden');
+                btnGps.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+            } else if (tab === 'orders') {
+                ord.classList.remove('hidden');
+                btnOrd.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadOrders();
+                loadAggregated();
+            } else if (tab === 'cement-news') {
+                cnw.classList.remove('hidden');
+                btnCnw.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadCementNews();
+            } else if (tab === 'contacts') {
+                cnt.classList.remove('hidden');
+                btnCnt.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadContacts();
+            } else if (tab === 'accounts') {
+                acc.classList.remove('hidden');
+                btnAcc.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                const d = document.getElementById('accounts-date');
+                if (!d.value) d.value = new Date().toISOString().slice(0,10);
+                loadStationAccounts();
+            } else if (tab === 'ostool') {
+                ost.classList.remove('hidden');
+                btnOst.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadOstoolOps();
+            } else if (tab === 'users') {
+                usr.classList.remove('hidden');
+                btnUsr.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadUsers();
+            } else {
+                rep.classList.remove('hidden');
+                btnRep.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                if (!reportData) loadReport();
+                loadRecipients();
+            }
+        }
+
+        async function loadReport() {
+            const el = document.getElementById('report-content');
+            el.innerHTML = '<p class="text-slate-500 text-center py-8">' + t('loadingReport') + '...</p>';
+            const date = document.getElementById('report-date')?.value || '';
+            try {
+                const url = date ? '/api/inventory/report?date=' + encodeURIComponent(date) : '/api/inventory/report';
+                const res = await fetch(url);
+                reportData = await res.json();
+                renderReport();
+            } catch {
+                el.innerHTML = '<p class="text-red-400 text-center py-8">Error loading report.</p>';
+            }
+        }
+
+        function renderReport() {
+            if (!reportData) return;
+            const { items, distributions_by_station, recent } = reportData;
+            let html = '';
+
+            // stock chart
+            html += '<div class="glass rounded-xl p-4 mb-4 border border-slate-600"><h3 class="text-sm font-bold text-amber-400 mb-3">' + t('stockLevels') + '</h3><div class="relative h-64"><canvas id="stockChart"></canvas></div></div>';
+
+            // distribution chart
+            if (distributions_by_station.length) {
+                html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">';
+                html += '<div class="glass rounded-xl p-4 border border-slate-600"><h3 class="text-sm font-bold text-amber-400 mb-3">' + t('distByStation') + '</h3><div class="relative h-64"><canvas id="distChart"></canvas></div></div>';
+                html += '<div class="glass rounded-xl p-4 border border-slate-600"><h3 class="text-sm font-bold text-amber-400 mb-3">' + t('stockVsThreshold') + '</h3><div class="relative h-64"><canvas id="thresholdChart"></canvas></div></div>';
+                html += '</div>';
+            }
+
+            // recent distributions table
+            if (recent.length) {
+                html += '<div class="glass rounded-xl p-4 border border-slate-600 mb-4"><h3 class="text-sm font-bold text-amber-400 mb-3">' + t('recentDist') + '</h3><div class="overflow-x-auto"><table class="w-full text-xs text-left" id="report-table"><thead><tr class="text-slate-400 border-b border-slate-700">';
+                html += '<th class="py-2 px-2">#</th><th class="py-2 px-2">' + t('date') + '</th><th class="py-2 px-2">' + t('item') + '</th><th class="py-2 px-2">' + t('station') + '</th><th class="py-2 px-2 text-right">' + t('weight') + '</th></tr></thead><tbody>';
+                for (const d of recent) {
+                    html += '<tr class="border-b border-slate-800"><td class="py-2 px-2 text-slate-500">' + (d.dist_num || '') + '</td><td class="py-2 px-2 text-slate-400">' + new Date(d.created_at).toLocaleDateString() + '</td><td class="py-2 px-2">' + esc(d.item_name) + '</td><td class="py-2 px-2">' + esc(d.station) + '</td><td class="py-2 px-2 text-right font-bold">' + Number(d.weight).toFixed(2) + '</td></tr>';
+                }
+                html += '</tbody></table></div></div>';
+            }
+
+            // stock summary table
+            html += '<div class="glass rounded-xl p-4 border border-slate-600"><h3 class="text-sm font-bold text-amber-400 mb-3">' + t('stockSummary') + ' <span class="text-xs text-slate-500">(' + (reportData.report_date || '') + ')</span></h3><div class="overflow-x-auto"><table class="w-full text-xs text-left" id="stock-table"><thead><tr class="text-slate-400 border-b border-slate-700">';
+            html += '<th class="py-2 px-2">' + t('item') + '</th><th class="py-2 px-2 text-right">' + t('openingStock') + '</th><th class="py-2 px-2 text-right">' + t('todayAdditions') + '</th><th class="py-2 px-2 text-right">' + t('todayDistributions') + '</th><th class="py-2 px-2 text-right">' + t('currentStock') + '</th><th class="py-2 px-2 text-right">' + t('threshold') + '</th><th class="py-2 px-2 text-right">' + t('status') + '</th></tr></thead><tbody>';
+            for (const i of items) {
+                const opening = i.current_stock - i.today_additions + i.today_distributions;
+                const status = i.current_stock <= i.warning_threshold ? '<span class="text-yellow-400">⚠ ' + t('low') + '</span>' : '<span class="text-emerald-400">✓ ' + t('ok') + '</span>';
+                html += '<tr class="border-b border-slate-800"><td class="py-2 px-2">' + esc(i.name) + '</td><td class="py-2 px-2 text-right text-slate-400">' + opening.toFixed(2) + '</td><td class="py-2 px-2 text-right text-emerald-400">+' + Number(i.today_additions).toFixed(2) + '</td><td class="py-2 px-2 text-right text-rose-400">-' + Number(i.today_distributions).toFixed(2) + '</td><td class="py-2 px-2 text-right font-bold">' + Number(i.current_stock).toFixed(2) + '</td><td class="py-2 px-2 text-right">' + i.warning_threshold + '</td><td class="py-2 px-2 text-right">' + status + '</td></tr>';
+            }
+            html += '</tbody></table></div></div>';
+
+            document.getElementById('report-content').innerHTML = html;
+
+            // render charts after DOM update
+            setTimeout(() => {
+                renderStockChart(items);
+                if (distributions_by_station.length) {
+                    renderDistChart(distributions_by_station);
+                    renderThresholdChart(items);
+                }
+            }, 50);
+        }
+
+        let stockChartInstance = null;
+        let distChartInstance = null;
+        let thresholdChartInstance = null;
+
+        function renderStockChart(items) {
+            const ctx = document.getElementById('stockChart');
+            if (!ctx) return;
+            if (stockChartInstance) stockChartInstance.destroy();
+            stockChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: items.map(i => i.name),
+                    datasets: [{
+                        label: t('currentStock'),
+                        data: items.map(i => i.current_stock),
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56,189,248,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: items.map(i => i.current_stock <= i.warning_threshold ? '#eab308' : '#38bdf8'),
+                        pointRadius: 6,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                        x: { ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        function renderDistChart(distributions_by_station) {
+            const ctx = document.getElementById('distChart');
+            if (!ctx) return;
+            if (distChartInstance) distChartInstance.destroy();
+            const colors = ['#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#fb923c'];
+            distChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: distributions_by_station.map(d => d.station),
+                    datasets: [{
+                        data: distributions_by_station.map(d => d.total),
+                        backgroundColor: colors.slice(0, distributions_by_station.length),
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderThresholdChart(items) {
+            const ctx = document.getElementById('thresholdChart');
+            if (!ctx) return;
+            if (thresholdChartInstance) thresholdChartInstance.destroy();
+            thresholdChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: items.map(i => i.name),
+                    datasets: [
+                        {
+                            label: t('currentStock'),
+                            data: items.map(i => i.current_stock),
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56,189,248,0.1)',
+                            tension: 0.3,
+                        },
+                        {
+                            label: t('threshold'),
+                            data: items.map(i => i.warning_threshold),
+                            borderColor: '#eab308',
+                            backgroundColor: 'rgba(234,179,8,0.1)',
+                            tension: 0.3,
+                            borderDash: [4, 4],
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            ticks: { color: '#94a3b8', backdropColor: 'transparent' },
+                            grid: { color: '#1e293b' },
+                            angleLines: { color: '#1e293b' },
+                            pointLabels: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadHistory(offset) {
+            historyOffset = offset;
+            const list = document.getElementById('history-list');
+            const pag = document.getElementById('history-pagination');
+            const statsEl = document.getElementById('dist-stats');
+            list.innerHTML = '<div class="text-xs text-slate-500 text-center py-4">Loading...</div>';
+
+            // Load distribution stats
+            try {
+                const sr = await fetch('/api/inventory/distributions/stats');
+                const s = await sr.json();
+                statsEl.innerHTML = '<div class="bg-slate-900/50 rounded p-2 text-center"><span class="text-xs text-slate-400 block">' + t('completed') + '</span><span class="text-lg font-bold text-emerald-400">' + s.completed_distributions + '</span></div>' +
+                    '<div class="bg-slate-900/50 rounded p-2 text-center"><span class="text-xs text-slate-400 block">' + t('totalWeight') + '</span><span class="text-lg font-bold text-amber-400">' + Number(s.total_weight).toFixed(2) + '</span></div>' +
+                    '<div class="bg-slate-900/50 rounded p-2 text-center"><span class="text-xs text-slate-400 block">' + t('stations') + '</span><span class="text-lg font-bold text-purple-400">' + s.unique_stations + '</span></div>';
+            } catch {}
+
+            try {
+                const res = await fetch(`/api/inventory/history?limit=${HISTORY_LIMIT}&offset=${offset}`);
+                const data = await res.json();
+                const txs = data.transactions;
+                if (!txs.length) {
+                    list.innerHTML = `<div class="text-xs text-slate-500 text-center py-4">${t('noTx')}</div>`;
+                } else {
+                    list.innerHTML = txs.map(tx => {
+                        const isDist = tx.type === 'distribution';
+                        const cls = isDist ? 'text-rose-400' : 'text-emerald-400';
+                        const sign = isDist ? '−' : '+';
+                        const distNum = isDist && tx.dist_num ? tx.dist_num + '.' : '';
+                        return `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-800 last:border-0">
+                            <div><span class="text-slate-600 font-mono">${distNum}</span><span class="text-slate-500">${new Date(tx.created_at).toLocaleDateString()}</span> <span class="${cls} font-bold">${tx.item_name}</span></div>
+                            <div><span class="${cls}">${sign}${tx.quantity}</span> <span class="text-slate-500">${tx.note || ''}</span></div>
+                        </div>`;
+                    }).join('');
+                }
+                const total = data.total;
+                const pages = Math.ceil(total / HISTORY_LIMIT);
+                const curPage = Math.floor(offset / HISTORY_LIMIT) + 1;
+                pag.innerHTML = `
+                    <span>${total} total</span>
+                    <div class="flex gap-2">
+                        <button onclick="loadHistory(${Math.max(0, offset - HISTORY_LIMIT)})" class="${offset <= 0 ? 'text-slate-600 cursor-default' : 'text-amber-400 hover:text-amber-300'}">← Prev</button>
+                        <span class="text-slate-400">${curPage}/${pages || 1}</span>
+                        <button onclick="loadHistory(${offset + HISTORY_LIMIT})" class="${offset + HISTORY_LIMIT >= total ? 'text-slate-600 cursor-default' : 'text-amber-400 hover:text-amber-300'}">Next →</button>
+                    </div>`;
+            } catch {
+                list.innerHTML = `<div class="text-xs text-red-400 text-center py-4">Error loading history</div>`;
+            }
+        }
+
+        function exportCSV() {
+            if (!items.length) { alert('No data to export'); return; }
+            let csv = 'Item,Current Stock,Threshold,Status\n';
+            for (const i of items) {
+                const s = i.current_stock <= i.warning_threshold ? 'LOW' : 'OK';
+                csv += `"${i.name}",${i.current_stock},${i.warning_threshold},${s}\n`;
+            }
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'inventory_report.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function printReport() {
+            if (!reportData) loadReport().then(() => setTimeout(printReport, 500));
+            else window.print();
+        }
+
+        async function sendAlertReport() {
+            if (!confirm(t('sendReportConfirm'))) return;
+            const btn = document.getElementById('send-report-btn');
+            btn.disabled = true;
+            btn.textContent = '⏳ ...';
+            try {
+                const checks = document.querySelectorAll('.recipient-check:checked');
+                const recipient_ids = Array.from(checks).map(c => parseInt(c.value));
+                const res = await fetch('/api/inventory/send-report', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({recipient_ids})
+                });
+                const data = await res.json();
+                const msg = data.errors && data.errors.length
+                    ? t('reportFailed') + '\n' + data.errors.join('\n')
+                    : t('reportSent');
+                alert(msg);
+            } catch {
+                alert(t('error'));
+            }
+            btn.disabled = false;
+            btn.innerHTML = '📧 <span data-i18n="sendReport">Send Report</span>';
+        }
+
+        async function loadCementNews() {
+             const el = document.getElementById('cement-news-list');
+             const ts = document.getElementById('news-timestamp');
+             try {
+                 const res = await fetch('/api/inventory/cement-news');
+                 const data = await res.json();
+                 if (data.egypt_time) ts.textContent = '🕒 ' + data.egypt_time;
+                 if (data.error) { el.innerHTML = '<p class="text-red-400 text-center py-4">' + t('newsError') + '</p>'; return; }
+                 if (!data.articles.length) { el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noResults') + '</p>'; return; }
+                 let html = '<div class="space-y-2">';
+                 data.articles.forEach(a => {
+                     const src = a.source ? ' — <span class="text-slate-500">' + esc(a.source) + '</span>' : '';
+                     const d = a.date ? ' <span class="text-slate-600 text-[10px]">' + new Date(a.date).toLocaleDateString('ar-EG') + '</span>' : '';
+                     html += '<a href="' + esc(a.link) + '" target="_blank" class="block glass rounded-lg p-3 border border-slate-700 hover:border-amber-500 transition">' +
+                         '<div class="text-xs text-slate-200 leading-relaxed">' + esc(a.title) + '</div>' +
+                         '<div class="text-[10px] text-slate-500 mt-1">' + src + d + '</div></a>';
+                 });
+                 html += '</div>';
+                 el.innerHTML = html;
+             } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">' + t('newsError') + '</p>'; }
+        }
+
+        async function loadContacts() {
+            const el = document.getElementById('contacts-list');
+            try {
+                const res = await fetch('/api/inventory/contacts');
+                const data = await res.json();
+                if (!data.length) { el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noContacts') + '</p>'; return; }
+                let html = '<table class="w-full text-left"><thead><tr class="text-slate-400 border-b border-slate-700">' +
+                    '<th class="py-2 px-2">' + t('contactName') + '</th>' +
+                    '<th class="py-2 px-2">' + t('contactPhone') + '</th>' +
+                    '<th class="py-2 px-2">' + t('contactStatus') + '</th>' +
+                    '<th class="py-2 px-2"></th></tr></thead><tbody>';
+                data.forEach(c => {
+                    const available = c.status === 'available';
+                    const hasWA = c.has_whatsapp;
+                    html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
+                        '<td class="py-2 px-2 font-bold text-amber-400">' + esc(c.name) + '</td>' +
+                        '<td class="py-2 px-2 text-slate-300">' + esc(c.phone || '—') + '</td>' +
+                        '<td class="py-2 px-2">' + (available
+                            ? '<span class="text-emerald-400 text-xs">' + t('callContact') + '</span>'
+                            : '<span class="text-yellow-400 text-xs">' + t('pendingContact') + '</span>') +
+                        '</td><td class="py-2 px-2 text-right">';
+                    if (c.phone) {
+                        html += '<a href="tel:' + c.phone + '" class="text-sky-400 hover:text-sky-300 mr-2" title="' + t('callContact') + '">' + t('callContact') + '</a>';
+                        if (hasWA) html += '<a href="https://wa.me/' + c.phone.replace(/^0+/, '20') + '" target="_blank" class="text-emerald-400 hover:text-emerald-300 mr-2" title="' + t('whatsappContact') + '">' + t('whatsappContact') + '</a>';
+                    } else {
+                        html += '<span class="text-yellow-400 text-xs">' + t('pendingContact') + '</span>';
+                    }
+                    html += '<button onclick="deleteContact(' + c.id + ')" class="text-red-400 hover:text-red-300 text-xs ml-2">' + t('deleteContact') + '</button>';
+                    html += '</td></tr>';
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading contacts</p>'; }
+        }
+
+        async function addContact() {
+            const name = document.getElementById('contact-name').value.trim();
+            const phone = document.getElementById('contact-phone').value.trim();
+            const has_whatsapp = document.getElementById('contact-whatsapp').checked;
+            const notes = document.getElementById('contact-notes').value.trim();
+            if (!name) { alert(t('error')); return; }
+            try {
+                const res = await fetch('/api/inventory/contacts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, phone, has_whatsapp, notes, status: phone ? 'available' : 'pending'})
+                });
+                if (res.ok) {
+                    document.getElementById('contact-name').value = '';
+                    document.getElementById('contact-phone').value = '';
+                    document.getElementById('contact-whatsapp').checked = false;
+                    document.getElementById('contact-notes').value = '';
+                    loadContacts();
+                } else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        async function deleteContact(id) {
+            try {
+                await fetch('/api/inventory/contacts/' + id, {method: 'DELETE'});
+                loadContacts();
+            } catch { alert(t('error')); }
+        }
+
+        async function loadOstoolOps() {
+            const el = document.getElementById('ostool-content');
+            const sel = document.getElementById('ostool-station-filter');
+            try {
+                const station = sel ? sel.value : '';
+                const date = document.getElementById('ostool-date')?.value || '';
+                let url = '/api/inventory/ostool-operations?';
+                const params = [];
+                if (station) params.push('station=' + encodeURIComponent(station));
+                if (date) params.push('date=' + encodeURIComponent(date));
+                url += params.join('&');
+                const res = await fetch(url);
+                const data = await res.json();
+                if (sel) {
+                    const current = sel.value;
+                    sel.innerHTML = '<option value="">' + t('allStations') + '</option>';
+                    (data.stations || []).forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s;
+                        opt.textContent = s;
+                        if (s === current) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                }
+                if (!data.companies.length) {
+                    el.innerHTML = '<p class="text-slate-500 text-center py-8">' + t('noOstool') + '</p>';
+                    return;
+                }
+                let html = '<div class="flex justify-between items-center mb-4 p-3 glass rounded-lg border border-slate-700">' +
+                    '<span class="text-sm text-slate-400">' + t('ostoolTotalOps') + ': <strong class="text-amber-400">' + data.grand_total_ops + '</strong></span>' +
+                    '<span class="text-sm text-slate-400">' + t('ostoolTotalWeight') + ': <strong class="text-amber-400">' + Number(data.grand_total_weight).toFixed(2) + '</strong> <span class="text-xs text-slate-500">t</span></span>' +
+                    '</div>';
+                html += '<table class="w-full text-left"><thead><tr class="text-slate-400 border-b border-slate-700">' +
+                    '<th class="py-2 px-2">#</th>' +
+                    '<th class="py-2 px-2" data-i18n="transportCompany">' + t('transportCompany') + '</th>' +
+                    '<th class="py-2 px-2" data-i18n="driverName">' + t('driverName') + '</th>' +
+                    '<th class="py-2 px-2" data-i18n="truckNumber">' + t('truckNumber') + '</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="ostoolOps">' + t('ostoolOps') + '</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="ostoolCompleted">' + t('ostoolCompleted') + '</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="weight">' + t('weight') + '</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="stations">' + t('stations') + '</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="lastOp">' + t('lastOp') + '</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="remarks">' + t('remarks') + '</th>' +
+                    '</tr></thead><tbody>';
+                data.companies.forEach((c, i) => {
+                    const dt = c.last_operation ? new Date(c.last_operation).toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US') : '—';
+                    const drivers = (data.drivers_map && data.drivers_map[c.transportation_company]) || '';
+                    const trucks = (data.trucks_map && data.trucks_map[c.transportation_company]) || '';
+                    const remarks = (data.remarks_map && data.remarks_map[c.transportation_company]) || '';
+                    html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
+                        '<td class="py-2 px-2 text-slate-500">' + (i + 1) + '</td>' +
+                        '<td class="py-2 px-2 font-bold text-amber-400">' + esc(c.transportation_company) + '</td>' +
+                        '<td class="py-2 px-2 text-sky-400 text-[11px]">' + esc(drivers).replace(/,/g, '<br>') + '</td>' +
+                        '<td class="py-2 px-2 text-slate-400 text-[11px]">' + esc(trucks).replace(/,/g, '<br>') + '</td>' +
+                        '<td class="py-2 px-2 text-right text-slate-300">' + c.operation_count + '</td>' +
+                        '<td class="py-2 px-2 text-right text-emerald-400">' + c.completed_count + '</td>' +
+                        '<td class="py-2 px-2 text-right text-slate-300 font-bold">' + Number(c.total_weight).toFixed(2) + '</td>' +
+                        '<td class="py-2 px-2 text-right text-slate-300 text-[11px]">' + (data.stations_map[c.transportation_company] || '—').split(',').join('<br>') + '</td>' +
+                        '<td class="py-2 px-2 text-right text-slate-500 text-[10px]">' + dt + '</td>' +
+                        '<td class="py-2 px-2 text-rose-400 text-[10px] max-w-[120px] truncate" title="' + esc(remarks) + '">' + (remarks ? remarks.replace(/,/g, '<br>') : '—') + '</td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch {
+                el.innerHTML = '<p class="text-red-400 text-center py-8">Error loading Ostool operations</p>';
+            }
+        }
+
+        async function sendOstoolEmail() {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = t('sending') + '...';
+            btn.disabled = true;
+            const station = document.getElementById('ostool-station-filter')?.value || '';
+            const date = document.getElementById('ostool-date')?.value || '';
+            const to_emails = document.getElementById('ostool-emails')?.value.trim() || '';
+            const general_note = document.getElementById('ostool-general-note')?.value.trim() || '';
+            try {
+                const res = await fetch('/api/inventory/ostool-operations/email', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ station, date, general_note, to_emails })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    alert(t('ostoolEmailSent'));
+                } else {
+                    alert(t('error') + ': ' + (data.error || ''));
+                }
+            } catch {
+                alert(t('error'));
+            }
+            btn.textContent = orig;
+            btn.disabled = false;
+        }
+
+        function printOstool() {
+            const content = document.getElementById('ostool-content');
+            const printWindow = window.open('', '_blank');
+            const title = t('ostool');
+            printWindow.document.write(`
+                <html><head><title>${title}</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #333; }
+                    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    th { background: #92400e; color: white; padding: 10px 12px; text-align: left; }
+                    th:last-child, td:last-child { text-align: right; }
+                    td { padding: 8px 12px; border-bottom: 1px solid #ddd; }
+                    .totals { display: flex; gap: 20px; margin-bottom: 20px; padding: 15px; background: #fef3c7; border-radius: 8px; font-weight: bold; }
+                    h1 { color: #92400e; font-size: 18px; margin-bottom: 6px; }
+                    .sub { color: #666; font-size: 12px; margin-bottom: 20px; }
+    </style></head><body>
+                    <h1>🚛 ${title}</h1>
+                    <div class="sub">${new Date().toLocaleDateString()}</div>
+                    ${content.innerHTML}
+                </body></html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => printWindow.print(), 500);
+        }
+
+        async function loadOrders() {
+            const el = document.getElementById('pending-orders-list');
+            try {
+                const res = await fetch('/api/inventory/orders');
+                const data = await res.json();
+                const pending = data.filter(o => o.status === 'pending');
+                const refused = data.filter(o => o.status === 'refused');
+                if (!pending.length && !refused.length) {
+                    el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noPending') + '</p>';
+                    return;
+                }
+                let html = '';
+                pending.forEach(o => {
+                    html += '<div class="flex flex-wrap items-center gap-2 py-2 border-b border-slate-700">' +
+                        '<span class="font-bold text-amber-400 min-w-[120px]">' + esc(o.customer_name) + '</span>' +
+                        '<span class="text-slate-300">' + esc(o.item_name) + '</span>' +
+                        '<span class="text-slate-400">' + Number(o.quantity).toFixed(2) + ' ' + o.unit + '</span>' +
+                        (o.phone ? '<span class="text-slate-500">' + esc(o.phone) + '</span>' : '') +
+                        '<span class="text-xs text-yellow-400 ml-auto">' + new Date(o.created_at).toLocaleString() + '</span>' +
+                        '<button onclick="acceptOrder(' + o.id + ')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold transition">' + t('accept') + '</button>' +
+                        '<button onclick="showRefuseDialog(' + o.id + ')" class="bg-rose-700 hover:bg-rose-600 text-white px-3 py-1 rounded text-xs font-bold transition">' + t('refuse') + '</button>' +
+                        '</div>';
+                });
+                refused.forEach(o => {
+                    html += '<div class="flex flex-wrap items-center gap-2 py-2 border-b border-slate-700 opacity-60">' +
+                        '<span class="font-bold text-red-400 min-w-[120px]">' + esc(o.customer_name) + '</span>' +
+                        '<span class="text-slate-300">' + esc(o.item_name) + '</span>' +
+                        '<span class="text-slate-400">' + Number(o.quantity).toFixed(2) + ' ' + o.unit + '</span>' +
+                        (o.refusal_reason ? '<span class="text-red-400 text-xs">(' + t('refusalReason') + ': ' + esc(o.refusal_reason) + ')</span>' : '') +
+                        '<span class="text-xs text-red-400 ml-auto">' + t('refuse') + '</span>' +
+                        '</div>';
+                });
+                el.innerHTML = html;
+            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading orders</p>'; }
+        }
+
+        async function loadAggregated() {
+            const el = document.getElementById('accepted-orders-list');
+            try {
+                const res = await fetch('/api/inventory/orders/aggregate');
+                const data = await res.json();
+                const items = data.items || [];
+                if (!items.length) {
+                    el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noAccepted') + '</p>';
+                    return;
+                }
+                let html = '<table class="w-full text-left"><thead><tr class="text-slate-400 border-b border-slate-700">' +
+                    '<th class="py-2 px-2">' + t('orderCustomer') + '</th>' +
+                    '<th class="py-2 px-2">' + t('orderItem') + '</th>' +
+                    '<th class="py-2 px-2 text-right">' + t('orderQty') + '</th>' +
+                    '</tr></thead><tbody>';
+                items.forEach(a => {
+                    html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
+                        '<td class="py-2 px-2 font-bold text-emerald-400">' + esc(a.customer_name) + '</td>' +
+                        '<td class="py-2 px-2">' + esc(a.item_name) + '</td>' +
+                        '<td class="py-2 px-2 text-right font-bold">' + Number(a.total_qty).toFixed(2) + ' ' + a.unit + '</td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>' +
+                    '<div class="text-right text-sm font-bold text-emerald-400 mt-2 pt-2 border-t border-slate-700">' +
+                    t('orderQty') + ': ' + Number(data.grand_total).toFixed(2) + '</div>';
+                el.innerHTML = html;
+            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading accepted orders</p>'; }
+        }
+
+        async function createOrder() {
+            const customer = document.getElementById('order-customer').value.trim();
+            const phone = document.getElementById('order-phone').value.trim();
+            const item = document.getElementById('order-item').value.trim();
+            const qty = parseFloat(document.getElementById('order-qty').value);
+            if (!customer || !item || !qty || qty <= 0) { alert(t('error')); return; }
+            try {
+                const res = await fetch('/api/inventory/orders', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({customer_name: customer, phone, item_name: item, quantity: qty})
+                });
+                if (res.ok) {
+                    document.getElementById('order-customer').value = '';
+                    document.getElementById('order-phone').value = '';
+                    document.getElementById('order-item').value = '';
+                    document.getElementById('order-qty').value = '';
+                    loadOrders();
+                    loadAggregated();
+                } else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        async function acceptOrder(id) {
+            try {
+                const res = await fetch('/api/inventory/orders/' + id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: 'accepted'})
+                });
+                if (res.ok) { loadOrders(); loadAggregated(); }
+                else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        let refusingOrderId = null;
+
+        function showRefuseDialog(id) {
+            refusingOrderId = id;
+            const reason = prompt(t('refusalReason') + ':');
+            if (reason === null) return;
+            refuseOrder(id, reason.trim());
+        }
+
+        async function refuseOrder(id, reason) {
+            try {
+                const res = await fetch('/api/inventory/orders/' + id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({status: 'refused', refusal_reason: reason || ''})
+                });
+                if (res.ok) { loadOrders(); }
+                else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        function esc(s) { return String(s).replace(/[&<>"]/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+
+        function togglePassword(fieldId, btn) {
+            const f = document.getElementById(fieldId);
+            if (f.type === 'password') { f.type = 'text'; btn.textContent = '🙈'; }
+            else { f.type = 'password'; btn.textContent = '👁️'; }
+        }
+
+        // ─── Autocomplete ─────────────────────────────────────────
+        const autoDL = document.getElementById('global-suggest');
+        function initAuto(fieldId) {
+            const el = document.getElementById(fieldId);
+            if (!el) return;
+            el.setAttribute('autocomplete', 'off');
+            el.addEventListener('focus', () => {
+                const saved = JSON.parse(localStorage.getItem('ac_' + fieldId) || '[]');
+                autoDL.innerHTML = saved.map(v => '<option value="' + esc(v) + '">').join('');
+            });
+            el.addEventListener('change', () => {
+                const val = el.value.trim();
+                if (!val) return;
+                let saved = JSON.parse(localStorage.getItem('ac_' + fieldId) || '[]');
+                saved = [val, ...saved.filter(v => v !== val)].slice(0, 50);
+                localStorage.setItem('ac_' + fieldId, JSON.stringify(saved));
+            });
+        }
+
+        // ─── User Management ──────────────────────────────────────
+        async function loadUsers() {
+            const tbody = document.getElementById('users-tbody');
+            if (!tbody) return;
+            try {
+                const res = await fetch('/api/users', {
+                    headers: {'Authorization': 'Bearer ' + localStorage.getItem('token')}
+                });
+                if (!res.ok) { const e = await res.json(); tbody.innerHTML = '<tr><td colspan="5" class="text-red-400 text-center py-4">' + (e.detail || res.status + ' Error') + '</td></tr>'; return; }
+                const users = await res.json();
+                tbody.innerHTML = users.map(u => `<tr class="border-b border-slate-700">
+                    <td class="py-2 px-2 text-slate-500">${u.id}</td>
+                    <td class="py-2 px-2 text-white font-bold">${esc(u.username)}</td>
+                    <td class="py-2 px-2"><span class="text-xs px-2 py-0.5 rounded ${u.role === 'admin' ? 'bg-red-700 text-white' : u.role === 'editor' ? 'bg-emerald-700 text-white' : 'bg-slate-600 text-white'}">${u.role}</span></td>
+                    <td class="py-2 px-2 text-slate-400 text-xs">${u.created_at || '—'}</td>
+                    <td class="py-2 px-2">
+                        <button onclick="editUser(${u.id}, '${esc(u.username)}', '${u.role}')" class="bg-amber-600 hover:bg-amber-500 text-white px-2 py-1 rounded text-xs transition">✏️</button>
+                        <button onclick="deleteUser(${u.id})" class="bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs transition ml-1">🗑️</button>
+                    </td>
+                </tr>`).join('');
+            } catch { tbody.innerHTML = '<tr><td colspan="5" class="text-red-400 text-center py-4">Error</td></tr>'; }
+        }
+
+        function openAddUserModal() { document.getElementById('add-user-modal').classList.remove('hidden'); }
+        function closeAddUserModal() { document.getElementById('add-user-modal').classList.add('hidden'); }
+        async function confirmAddUser() {
+            const username = document.getElementById('new-username').value.trim();
+            const password = document.getElementById('new-password').value.trim();
+            const role = document.getElementById('new-role').value;
+            if (!username || !password) return alert(t('reqUserFields'));
+            if (!/^[A-Za-z0-9_]+$/.test(username)) return alert('Username: English letters, numbers, and underscore only');
+            if (!/^[A-Za-z0-9_!@#$%^&*]+$/.test(password)) return alert('Password: English characters only');
+            try {
+                const res = await fetch('/api/users', {
+                    method: 'POST', headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token')},
+                    body: JSON.stringify({username, password, role})
+                });
+                if (!res.ok) { const e = await res.json(); return alert((e.detail || '') + ' (HTTP ' + res.status + ')'); }
+                closeAddUserModal();
+                document.getElementById('new-username').value = '';
+                document.getElementById('new-password').value = '';
+                loadUsers();
+            } catch { alert(t('error')); }
+        }
+
+        function editUser(id, username, role) {
+            document.getElementById('edit-user-id').value = id;
+            document.getElementById('edit-username').value = username;
+            document.getElementById('edit-role').value = role;
+            document.getElementById('edit-password').value = '';
+            document.getElementById('edit-user-modal').classList.remove('hidden');
+        }
+        function closeEditUserModal() { document.getElementById('edit-user-modal').classList.add('hidden'); }
+        async function confirmEditUser() {
+            const id = document.getElementById('edit-user-id').value;
+            const role = document.getElementById('edit-role').value;
+            const password = document.getElementById('edit-password').value.trim();
+            try {
+                const res = await fetch('/api/users/' + id, {
+                    method: 'PUT', headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('token')},
+                    body: JSON.stringify({role, password})
+                });
+                if (!res.ok) { const e = await res.json(); return alert(e.detail || 'Error'); }
+                closeEditUserModal();
+                loadUsers();
+            } catch { alert(t('error')); }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm(t('deleteUserConfirm'))) return;
+            try {
+                const res = await fetch('/api/users/' + id, {
+                    method: 'DELETE', headers: {'Authorization':'Bearer '+localStorage.getItem('token')}
+                });
+                if (!res.ok) { const e = await res.json(); return alert(e.detail || 'Error'); }
+                loadUsers();
+            } catch { alert(t('error')); }
+        }
+
+        function printAccounts() { window.print(); }
+
+        async function loadRecipients() {
+            const el = document.getElementById('recipients-list');
+            try {
+                const res = await fetch('/api/inventory/recipients');
+                const data = await res.json();
+                if (!data.length) {
+                    el.innerHTML = '<span class="text-slate-500">' + t('noRecipients') + '</span>';
+                    return;
+                }
+                el.innerHTML = data.map(r =>
+                    '<label class="inline-flex items-center gap-2 mr-4 mb-2 cursor-pointer hover:text-amber-300">' +
+                    '<input type="checkbox" class="recipient-check" value="' + r.id + '" checked class="rounded border-slate-600 bg-slate-800">' +
+                    '<span>' + esc(r.email) + '</span>' +
+                    '<button onclick="deleteRecipient(' + r.id + ')" class="text-red-400 hover:text-red-300 ml-1" title="' + t('deleteEmail') + '">' + t('deleteEmail') + '</button>' +
+                    '</label>'
+                ).join('');
+            } catch { el.innerHTML = '<span class="text-red-400">Error loading recipients</span>'; }
+        }
+
+        async function addRecipient() {
+            const input = document.getElementById('new-email-input');
+            const email = input.value.trim();
+            if (!email || !email.includes('@')) { alert(t('error')); return; }
+            try {
+                const res = await fetch('/api/inventory/recipients', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email})
+                });
+                if (res.ok) { input.value = ''; await loadRecipients(); }
+                else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        async function deleteRecipient(id) {
+            try {
+                await fetch('/api/inventory/recipients/' + id, {method: 'DELETE'});
+                await loadRecipients();
+            } catch { alert(t('error')); }
+        }
+
+        function populateItemSelect() {
+            const sel = document.getElementById('item-select');
+            if (!sel) return;
+            const current = sel.value;
+            sel.innerHTML = '<option value="">' + t('selectType') + '</option>';
+            items.forEach(i => {
+                const opt = document.createElement('option');
+                opt.value = i.id;
+                opt.textContent = i.name;
+                if (String(i.id) === current) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function itemSelectChanged(id) {
+            if (!id) return;
+            const item = items.find(i => i.id === Number(id));
+            if (item) viewItem(item.id);
+        }
+
+        async function quickCreate(name) {
+            const exists = items.find(i => i.name === name);
+            if (exists) return viewItem(exists.id);
+            const res = await fetch('/api/inventory/items', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name,
+                    description: '',
+                    beginning_stock: 0,
+                    warning_threshold: 10,
+                })
+            });
+            if (res.ok) {
+                await fetchItems();
+                const item = items.find(i => i.name === name);
+                if (item) viewItem(item.id);
+            } else {
+                const err = await res.json();
+                alert(t('error') + ': ' + (err.detail || ''));
+            }
+        }
+
+        let stationSearchTimeout = null;
+
+        async function searchStations() {
+            const q = document.getElementById('station-search').value.trim();
+            const el = document.getElementById('station-results');
+            if (!q) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+            try {
+                const res = await fetch(`/api/inventory/stations/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                if (!data.length) {
+                    el.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">' + t('noResults') + '</div>';
+                } else {
+                    el.innerHTML = data.map(d => {
+                        const status = d.status === 'completed' ? 'text-emerald-400' : 'text-yellow-400';
+                        const num = d.dist_num || '';
+                        return '<div class="glass rounded-lg p-2 border border-slate-600 text-xs flex justify-between items-center">' +
+                            '<div><span class="text-slate-600 font-mono w-4 inline-block">' + num + '.</span>' +
+                            '<span class="text-amber-400 font-bold">' + esc(d.station) + '</span>' +
+                            ' <span class="text-slate-400">→</span> <span class="font-bold">' + esc(d.item_name) + '</span>' +
+                            ' <span class="text-slate-500">' + new Date(d.created_at).toLocaleDateString() + '</span></div>' +
+                            '<div><span class="font-bold">' + Number(d.weight).toFixed(2) + '</span> <span class="text-slate-500">t</span>' +
+                            ' <span class="' + status + '">' + (d.status === 'completed' ? '✓' : '⏳') + '</span></div></div>';
+                    }).join('');
+                }
+                el.classList.remove('hidden');
+            } catch { el.innerHTML = '<div class="text-xs text-red-400 text-center py-2">Error</div>'; el.classList.remove('hidden'); }
+        }
+
+        function switchSearchMode(mode) {
+            ['files', 'maps', 'app'].forEach(m => {
+                const panel = document.getElementById('search-panel-' + m);
+                const btn = document.getElementById('search-mode-' + m);
+                if (panel) panel.classList.add('hidden');
+                if (btn) btn.className = 'px-3 py-1.5 text-xs font-bold rounded border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition';
+            });
+            const activePanel = document.getElementById('search-panel-' + mode);
+            const activeBtn = document.getElementById('search-mode-' + mode);
+            if (activePanel) activePanel.classList.remove('hidden');
+            if (activeBtn) activeBtn.className = 'px-3 py-1.5 text-xs font-bold rounded border-b-2 border-amber-400 text-amber-400 transition';
+        }
+
+        let searchFilesTimeout = null;
+        async function searchDistancesFiles() {
+            const q = document.getElementById('search-files-input').value.trim();
+            const el = document.getElementById('search-files-results');
+            clearTimeout(searchFilesTimeout);
+            if (!q) { el.innerHTML = '<div class="text-slate-500 text-center py-2 text-xs">' + t('noResults') + '</div>'; return; }
+            searchFilesTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch('/api/inventory/distances-search?q=' + encodeURIComponent(q));
+                    const data = await res.json();
+                    if (!data.results || !data.results.length) {
+                        el.innerHTML = '<div class="text-slate-500 text-center py-2 text-xs">' + t('noResults') + '</div>';
+                    } else {
+                        el.innerHTML = data.results.map(r => {
+                            const pairs = Object.entries(r.row).map(([k, v]) => '<span class="text-slate-500">' + esc(k) + ':</span> <span class="text-amber-400 font-bold">' + esc(v) + '</span>').join(' &nbsp;|&nbsp; ');
+                            return '<div class="glass rounded-lg p-2 border border-slate-600 text-xs flex justify-between items-center">' +
+                                '<span class="text-slate-500 mr-2 w-20 truncate">' + esc(r.file) + '</span>' +
+                                '<span class="flex-1 text-left">' + pairs + '</span></div>';
+                        }).join('');
+                    }
+                } catch {
+                    el.innerHTML = '<div class="text-red-400 text-center py-2 text-xs">Error</div>';
+                }
+            }, 300);
+        }
+
+        function openGoogleMaps() {
+            const from = document.getElementById('maps-from').value.trim();
+            const to = document.getElementById('maps-to').value.trim();
+            if (!to) { alert(t('reqDestination')); return; }
+            const url = 'https://www.google.com/maps/dir/' + encodeURIComponent(from) + '/' + encodeURIComponent(to);
+            window.open(url, '_blank');
+        }
+
+        async function fetchItems() {
+            const res = await fetch('/api/inventory/items');
+            items = await res.json();
+            populateItemSelect();
+            renderItems();
+            renderAlerts();
+        }
+
+        function renderAlerts() {
+            const bar = document.getElementById('alerts-bar');
+            const alertItems = items.filter(i => i.current_stock <= i.warning_threshold);
+            if (!alertItems.length) { bar.classList.add('hidden'); return; }
+            bar.classList.remove('hidden');
+            bar.innerHTML = '<div class="text-xs text-slate-400 font-bold mb-2 uppercase tracking-wider" data-i18n="alertTitle">' + t('alertTitle') + '</div>'
+                + alertItems.map(i =>
+                    `<div class="glass rounded-lg px-4 py-3 flex items-center gap-3 mb-2 ${i.current_stock <= 0 ? 'danger-glow' : 'warning-glow'}">
+                        <span class="text-lg">${i.current_stock <= 0 ? '🚨' : '⚠️'}</span>
+                        <div class="flex-1">
+                            <span class="font-bold text-sm">${i.name}</span>
+                            <span class="text-xs text-slate-400 mr-2 ml-2">${t('stockLabel')}: ${i.current_stock} / ${t('threshold')}: ${i.warning_threshold}</span>
+                        </div>
+                        <button onclick="viewItem(${i.id})" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded text-xs transition">${t('view')}</button>
+                    </div>`
+                ).join('');
+        }
+
+        function renderItems() {
+            const grid = document.getElementById('items-grid');
+            if (!items.length) {
+                grid.innerHTML = `<div class="col-span-full text-center text-slate-500 py-12 text-sm">${t('noItems')}</div>`;
+            } else {
+                grid.innerHTML = items.map(i => {
+                    const isLow = i.current_stock <= i.warning_threshold;
+                    const isOut = i.current_stock <= 0;
+                    const statusText = isOut ? t('out') : isLow ? t('low') : t('ok');
+                    const statusColor = isOut ? 'text-red-400 bg-red-900/50' : isLow ? 'text-yellow-400 bg-yellow-900/50' : 'text-emerald-400 bg-emerald-900/50';
+                    const stockColor = isOut ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-white';
+                    return `
+                        <div onclick="viewItem(${i.id})" class="glass rounded-xl p-4 cursor-pointer hover:border-slate-500 transition ${isOut ? 'danger-glow' : isLow ? 'warning-glow' : ''}">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-bold text-sm text-amber-400 truncate">${i.name}</h3>
+                                <span class="text-xs px-2 py-0.5 rounded-full ${statusColor}">${statusText}</span>
+                            </div>
+                            ${i.description ? `<p class="text-xs text-slate-500 mb-2 truncate">${i.description}</p>` : ''}
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <span class="text-2xl font-bold ${stockColor}">${i.current_stock}</span>
+                                    <span class="text-xs text-slate-400 mr-1 ml-1">${t('units')}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[10px] text-slate-500 block">${t('threshold')}</span>
+                                    <span class="text-xs text-slate-400">${i.warning_threshold}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            renderSummaryBar();
+        }
+
+        function renderSummaryBar() {
+            const el = document.getElementById('summary-bar');
+            const total = items.reduce((s, i) => s + i.current_stock, 0);
+            const low = items.filter(i => i.current_stock <= i.warning_threshold).length;
+            const out = items.filter(i => i.current_stock <= 0).length;
+            el.innerHTML = `
+                <div class="glass rounded-xl p-3 text-center border border-slate-600">
+                    <span class="text-xs text-slate-400 block" data-i18n="totalItems">${t('totalItems')}</span>
+                    <span class="text-xl font-bold text-white">${items.length}</span>
+                </div>
+                <div class="glass rounded-xl p-3 text-center border border-slate-600">
+                    <span class="text-xs text-slate-400 block" data-i18n="totalStock">${t('totalStock')}</span>
+                    <span class="text-xl font-bold text-amber-400">${Number(total).toFixed(2)}</span>
+                </div>
+                <div class="glass rounded-xl p-3 text-center border border-slate-600">
+                    <span class="text-xs text-slate-400 block" data-i18n="lowItems">${t('lowItems')}</span>
+                    <span class="text-xl font-bold ${low ? 'text-yellow-400' : 'text-emerald-400'}">${low}</span>
+                </div>
+                <div class="glass rounded-xl p-3 text-center border border-slate-600">
+                    <span class="text-xs text-slate-400 block" data-i18n="outItems">${t('outItems')}</span>
+                    <span class="text-xl font-bold ${out ? 'text-red-400' : 'text-emerald-400'}">${out}</span>
+                </div>
+            `;
+        }
+
+        function switchDetailTab(tab) {
+            document.getElementById('detail-transactions').classList.toggle('hidden', tab !== 'transactions');
+            document.getElementById('detail-distributions').classList.toggle('hidden', tab !== 'distributions');
+            document.getElementById('tab-tx').className = tab === 'transactions'
+                ? 'px-3 py-2 text-xs font-bold border-b-2 border-amber-400 text-amber-400 transition'
+                : 'px-3 py-2 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition';
+            document.getElementById('tab-dist').className = tab === 'distributions'
+                ? 'px-3 py-2 text-xs font-bold border-b-2 border-amber-400 text-amber-400 transition'
+                : 'px-3 py-2 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition';
+        }
+
+        async function viewItem(id) {
+            selectedItemId = id;
+            const res = await fetch(`/api/inventory/items/${id}`);
+            const item = await res.json();
+            document.getElementById('detail-name').textContent = item.name;
+            document.getElementById('detail-desc').textContent = item.description || '';
+            document.getElementById('detail-stock').textContent = item.current_stock;
+            document.getElementById('detail-threshold').textContent = item.warning_threshold;
+            const statusEl = document.getElementById('detail-status');
+            if (item.current_stock <= 0) { statusEl.textContent = t('out'); statusEl.className = 'text-xl font-bold text-red-400'; }
+            else if (item.current_stock <= item.warning_threshold) { statusEl.textContent = t('low'); statusEl.className = 'text-xl font-bold text-yellow-400'; }
+            else { statusEl.textContent = t('ok'); statusEl.className = 'text-xl font-bold text-emerald-400'; }
+
+            document.getElementById('btn-add-stock').textContent = t('addStock');
+            document.getElementById('btn-distribute').textContent = t('distribute');
+            document.getElementById('btn-threshold').textContent = t('threshold');
+            document.getElementById('tab-tx').textContent = t('txHistory');
+            document.getElementById('tab-dist').textContent = t('distHistory');
+
+            switchDetailTab('transactions');
+
+            const tres = await fetch(`/api/inventory/items/${id}/transactions?limit=30`);
+            const txs = await tres.json();
+            const tbody = document.getElementById('detail-transactions');
+            const txList = txs.transactions || [];
+            if (!txList.length) {
+                tbody.innerHTML = `<div class="text-xs text-slate-500 text-center py-4">${t('noTx')}</div>`;
+            } else {
+                tbody.innerHTML = txList.map(tx => {
+                    const isDist = tx.type === 'distribution';
+                    const cls = tx.type === 'addition' ? 'text-emerald-400' : 'text-rose-400';
+                    const sign = tx.type === 'addition' ? '+' : '−';
+                    let noteLabel = tx.note;
+                    if (tx.type === 'addition' && tx.note === 'Beginning inventory') noteLabel = t('beginningInventory');
+                    const distNum = isDist && tx.dist_num ? tx.dist_num + '.' : '';
+                    return `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-800 last:border-0">
+                        <div>
+                            ${isDist ? `<span class="text-slate-600 font-mono">${distNum}</span><span class="text-purple-400 font-bold">⊕</span>` : `<span class="${cls} font-bold">${sign}${tx.quantity}</span>`}
+                            <span class="text-slate-500 mr-2 ml-2">${tx.previous_stock} → ${tx.new_stock}</span>
+                            ${noteLabel ? `<span class="text-slate-600">— ${noteLabel}</span>` : ''}
+                        </div>
+                        <span class="text-slate-600">${new Date(tx.created_at).toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US')}</span>
+                    </div>`;
+                }).join('');
+            }
+
+            const dres = await fetch(`/api/inventory/items/${id}/distributions?limit=30`);
+            const dists = await dres.json();
+            const dbody = document.getElementById('detail-distributions');
+            if (!dists.length) {
+                dbody.innerHTML = `<div class="text-xs text-slate-500 text-center py-4">${t('noDist')}</div>`;
+            } else {
+                dbody.innerHTML = dists.map(d => {
+                    const done = d.status === 'completed';
+                    const num = d.dist_num || '';
+                    const tc = d.transportation_company || '';
+                    const drv = d.driver_name || '';
+                    const trk = d.truck_number || '';
+                    const rem = d.remarks || '';
+                    return `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-800 last:border-0 ${done ? 'opacity-80' : ''}">
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-600 font-mono w-5 text-right">${num}.</span>
+                            <input type="checkbox" ${done ? 'checked' : ''} onchange="toggleDistribution(${d.id}, this.checked)" class="w-4 h-4 rounded cursor-pointer accent-green-500">
+                            <span class="${done ? 'text-green-400 font-bold' : 'text-purple-400 font-bold'}">${d.station}</span>
+                            <span class="text-slate-500 mr-2 ml-2">${Number(d.weight).toFixed(2)} ${t('units')}</span>
+                            ${tc ? '<span class="text-[10px] text-amber-500 bg-amber-900/30 px-1.5 py-0.5 rounded ml-1">' + esc(tc) + '</span>' : ''}
+                            ${drv ? '<span class="text-[10px] text-sky-400 bg-sky-900/30 px-1.5 py-0.5 rounded ml-1">' + esc(drv) + '</span>' : ''}
+                            ${trk ? '<span class="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded ml-1">' + esc(trk) + '</span>' : ''}
+                            ${rem ? '<span class="text-[10px] text-rose-400 bg-rose-900/30 px-1.5 py-0.5 rounded ml-1">' + esc(rem) + '</span>' : ''}
+                            ${done ? '<span class="text-[10px] text-green-500 bg-green-900/30 px-1.5 py-0.5 rounded ml-1">' + t('completed') + '</span>' : '<span class="text-[10px] text-yellow-500 bg-yellow-900/30 px-1.5 py-0.5 rounded ml-1">' + t('pending') + '</span>'}
+                        </div>
+                        <span class="text-slate-600">${new Date(d.created_at).toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US')}</span>
+                    </div>`;
+                }).join('');
+            }
+
+            document.getElementById('detail-modal').classList.remove('hidden');
+            document.getElementById('detail-modal').classList.add('flex');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+            document.getElementById('detail-modal').classList.remove('flex');
+            selectedItemId = null;
+        }
+
+        function openCreateModal() {
+            document.getElementById('create-name').value = '';
+            document.getElementById('create-desc').value = '';
+            document.getElementById('create-stock').value = '0';
+            document.getElementById('create-threshold').value = '10';
+            document.getElementById('create-modal').classList.remove('hidden');
+            document.getElementById('create-modal').classList.add('flex');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.add('hidden');
+            document.getElementById('create-modal').classList.remove('flex');
+            document.getElementById('create-name').value = '';
+            document.getElementById('create-desc').value = '';
+            document.getElementById('create-stock').value = '0';
+            document.getElementById('create-threshold').value = '10';
+        }
+
+        async function createItem() {
+            const name = document.getElementById('create-name').value.trim();
+            if (!name) return alert(t('reqName'));
+            const res = await fetch('/api/inventory/items', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name,
+                    description: document.getElementById('create-desc').value.trim(),
+                    beginning_stock: parseFloat(document.getElementById('create-stock').value) || 0,
+                    warning_threshold: parseFloat(document.getElementById('create-threshold').value) || 10,
+                })
+            });
+            closeCreateModal();
+            if (!res.ok) {
+                const err = await res.json();
+                alert(t('error') + ': ' + (err.detail || ''));
+                return;
+            }
+            await fetchItems();
+        }
+
+        async function toggleDistribution(distId, checked) {
+            if (!checked) return;
+            const res = await fetch(`/api/inventory/distributions/${distId}/complete`, { method: 'PUT' });
+            if (!res.ok) {
+                const err = await res.json();
+                return alert(t('error') + ': ' + (err.detail || ''));
+            }
+            await fetchItems();
+            if (selectedItemId) viewItem(selectedItemId);
+        }
+
+        async function deleteItem() {
+            if (!selectedItemId) return;
+            if (!confirm(t('deleteConfirm'))) return;
+            const res = await fetch(`/api/inventory/items/${selectedItemId}`, { method: 'DELETE' });
+            if (res.ok) {
+                document.getElementById('detail-modal').classList.add('hidden');
+                document.getElementById('detail-modal').classList.remove('flex');
+                selectedItemId = null;
+                loadItems();
+            } else {
+                alert('Failed to delete item');
+            }
+        }
+
+        function openStockModal() {
+            stockActionType = 'add';
+            document.getElementById('stock-qty').value = '';
+            document.getElementById('stock-note').value = '';
+            document.getElementById('stock-modal-title').textContent = t('addTitle');
+            document.getElementById('stock-modal-title').className = 'text-lg font-bold text-amber-400 mb-4';
+            document.getElementById('stock-confirm-btn').textContent = t('addBtn');
+            document.getElementById('stock-confirm-btn').className = 'bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition';
+            document.getElementById('stock-modal').classList.remove('hidden');
+            document.getElementById('stock-modal').classList.add('flex');
+        }
+
+        function closeStockModal() {
+            document.getElementById('stock-modal').classList.add('hidden');
+            document.getElementById('stock-modal').classList.remove('flex');
+        }
+
+        async function confirmStockAction() {
+            const qty = parseFloat(document.getElementById('stock-qty').value);
+            if (!qty || qty <= 0) return alert(t('reqQty'));
+            const note = document.getElementById('stock-note').value.trim();
+            const res = await fetch(`/api/inventory/items/${selectedItemId}/add`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ quantity: qty, note })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                return alert(t('error') + ': ' + (err.detail || ''));
+            }
+            closeStockModal();
+            await fetchItems();
+            viewItem(selectedItemId);
+        }
+
+        function openDistributeModal() {
+            document.getElementById('dist-station').value = '';
+            document.getElementById('dist-weight').value = '';
+            document.getElementById('dist-transport').value = '';
+            document.getElementById('dist-driver').value = '';
+            document.getElementById('dist-truck').value = '';
+            document.getElementById('dist-remarks').value = '';
+            document.getElementById('distribute-modal').classList.remove('hidden');
+            document.getElementById('distribute-modal').classList.add('flex');
+        }
+
+        function closeDistributeModal() {
+            document.getElementById('distribute-modal').classList.add('hidden');
+            document.getElementById('distribute-modal').classList.remove('flex');
+        }
+
+        async function confirmDistribute() {
+            const station = document.getElementById('dist-station').value.trim();
+            const weight = parseFloat(document.getElementById('dist-weight').value);
+            const transportation_company = document.getElementById('dist-transport').value.trim();
+            const driver_name = document.getElementById('dist-driver').value.trim();
+            const truck_number = document.getElementById('dist-truck').value.trim();
+            const remarks = document.getElementById('dist-remarks').value.trim();
+            if (!station) return alert(t('reqStation'));
+            if (!weight || weight <= 0) return alert(t('reqWeight'));
+            if (!transportation_company) return alert(t('reqTransportCompany'));
+            if (!driver_name) return alert(t('reqDriverName'));
+            if (!truck_number) return alert(t('reqTruckNumber'));
+            const res = await fetch(`/api/inventory/items/${selectedItemId}/distribute`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ station, weight, transportation_company, driver_name, truck_number, remarks })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                return alert(t('error') + ': ' + (err.detail || ''));
+            }
+            closeDistributeModal();
+            await fetchItems();
+            viewItem(selectedItemId);
+        }
+
+        function openThresholdModal() {
+            const item = items.find(i => i.id === selectedItemId);
+            document.getElementById('threshold-val').value = item ? item.warning_threshold : '';
+            document.getElementById('threshold-modal').classList.remove('hidden');
+            document.getElementById('threshold-modal').classList.add('flex');
+        }
+
+        function closeThresholdModal() {
+            document.getElementById('threshold-modal').classList.add('hidden');
+            document.getElementById('threshold-modal').classList.remove('flex');
+        }
+
+        async function confirmThreshold() {
+            const val = parseFloat(document.getElementById('threshold-val').value);
+            if (val < 0 || isNaN(val)) return alert(t('reqThreshold'));
+            await fetch(`/api/inventory/items/${selectedItemId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ warning_threshold: val })
+            });
+            closeThresholdModal();
+            await fetchItems();
+            viewItem(selectedItemId);
+        }
+
+        function toggleLang() {
+            currentLang = currentLang === 'en' ? 'ar' : 'en';
+            localStorage.setItem(LANG_KEY, currentLang);
+            applyTranslation();
+            fetchItems();
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/login';
+        }
+
+        async function loadStationAccounts() {
+            const tbody = document.getElementById('accounts-body');
+            const tfoot = document.getElementById('accounts-foot');
+            const empty = document.getElementById('accounts-empty');
+            const date = document.getElementById('accounts-date').value;
+            const q = date ? `?date=${date}` : '';
+            try {
+                const res = await fetch(`/api/inventory/station_accounts${q}`);
+                const data = await res.json();
+                const stations = data.stations;
+                if (!stations.length) {
+                    tbody.innerHTML = '';
+                    tfoot.innerHTML = '';
+                    empty.style.display = 'block';
+                    return;
+                }
+                empty.style.display = 'none';
+                tbody.innerHTML = stations.map((s, i) => {
+                    const id = `price_${i}`;
+                    return `<tr class="border-b border-slate-700 hover:bg-slate-800/50">
+                        <td class="py-2 px-3 font-bold text-amber-400">${s.station}</td>
+                        <td class="py-2 px-3">${s.item_name}</td>
+                        <td class="py-2 px-3 text-right">${Number(s.total_weight).toFixed(2)}</td>
+                        <td class="py-2 px-3 text-right"><input id="${id}" type="number" step="0.01" min="0" style="width:120px;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:4px 8px;color:white;text-align:right;" oninput="calcRevenue()" placeholder="___"></td>
+                        <td class="py-2 px-3 text-right text-emerald-400 font-bold" id="rev_${i}">0.00</td>
+                    </tr>`;
+                }).join('');
+                tfoot.innerHTML = `<tr class="font-bold">
+                    <td class="py-3 px-3 text-slate-400" colspan="3">${t('accountsTotalWeight')}: ${Number(data.grand_total_weight).toFixed(2)}</td>
+                    <td class="py-3 px-3 text-right text-slate-400">${t('accountsTotalRevenue')}</td>
+                    <td class="py-3 px-3 text-right text-emerald-400 text-lg" id="grand-total">0.00</td>
+                </tr>`;
+                window._stationData = stations;
+                calcRevenue();
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-red-400 text-center py-4">' + t('error') + '</td></tr>';
+            }
+        }
+
+        function calcRevenue() {
+            const stations = window._stationData || [];
+            let grand = 0;
+            stations.forEach((s, i) => {
+                const inp = document.getElementById(`price_${i}`);
+                const price = parseFloat(inp?.value) || 0;
+                const rev = s.total_weight * price;
+                const el = document.getElementById(`rev_${i}`);
+                if (el) el.textContent = rev.toFixed(2);
+                grand += rev;
+            });
+            const gt = document.getElementById('grand-total');
+            if (gt) gt.textContent = grand.toFixed(2);
+        }
+
+        applyTranslation();
+        fetchItems();
+        setInterval(fetchItems, 30000);
+
+        // Ostool email init
+        if (hasRole('admin')) document.getElementById('tab-main-users').style.display = '';
+        const rdi = document.getElementById('report-date');
+        if (rdi) rdi.value = new Date().toISOString().split('T')[0];
+        initAuto('dist-station');
+        initAuto('dist-transport');
+        initAuto('dist-driver');
+        initAuto('dist-truck');
+        const di = document.getElementById('ostool-date');
+        if (di) di.value = new Date().toISOString().split('T')[0];
+        const prev = localStorage.getItem('ostool_emails');
+        const ei = document.getElementById('ostool-emails');
+        if (ei && prev) ei.value = prev;
+        const prevNote = localStorage.getItem('ostool_general_note');
+        const gn = document.getElementById('ostool-general-note');
+        if (gn && prevNote) gn.value = prevNote;
+        fetch('/api/inventory/recipients').then(r => r.json()).then(rows => {
+            const dl = document.getElementById('ostool-email-list');
+            if (dl) {
+                dl.innerHTML = '';
+                rows.forEach(r => {
+                    const o = document.createElement('option');
+                    o.value = r.email;
+                    dl.appendChild(o);
+                });
+            }
+        }).catch(() => {});
+    </script>
+</body>
+</html>
