@@ -332,6 +332,10 @@ class InventoryBranch:
         self.router.add_api_route("/api/inventory/contacts/{contact_id}", self.get_contact, methods=["GET"])
         self.router.add_api_route("/api/inventory/contacts/{contact_id}", self.update_contact, methods=["PUT"])
         self.router.add_api_route("/api/inventory/contacts/{contact_id}", self.delete_contact, methods=["DELETE"])
+        self.router.add_api_route("/api/inventory/vehicles", self.list_vehicles, methods=["GET"])
+        self.router.add_api_route("/api/inventory/vehicles", self.create_vehicle, methods=["POST"])
+        self.router.add_api_route("/api/inventory/vehicles/{vehicle_id}/location", self.update_vehicle_location, methods=["PUT"])
+        self.router.add_api_route("/api/inventory/vehicles/{vehicle_id}", self.delete_vehicle, methods=["DELETE"])
         self.router.add_api_route("/api/inventory/ostool-operations", self.get_ostool_operations, methods=["GET"])
         self.router.add_api_route("/api/inventory/ostool-operations/email", self.send_ostool_email, methods=["POST"])
         self.router.add_api_route("/api/inventory/distances-search", self.search_distances_files, methods=["GET"])
@@ -407,6 +411,14 @@ class InventoryBranch:
                 notes TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS vehicles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                plate_number TEXT NOT NULL DEFAULT '',
+                current_location TEXT NOT NULL DEFAULT 'Inside the factory',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
         """)
         # Add archived column if upgrading existing DB
@@ -990,6 +1002,52 @@ class InventoryBranch:
         conn.close()
         return {"ok": True}
 
+    # ─── Vehicles ───
+    async def list_vehicles(self):
+        conn = self.db()
+        rows = conn.execute("SELECT * FROM vehicles ORDER BY name").fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    async def create_vehicle(self, body: dict):
+        name = body.get("name", "").strip()
+        if not name:
+            raise HTTPException(400, "Name required")
+        plate = body.get("plate_number", "").strip()
+        location = body.get("current_location", "Inside the factory")
+        allowed = ["Inside the factory","Outside the factory","On the way there","On the way back","At the location"]
+        if location not in allowed:
+            raise HTTPException(400, "Invalid location")
+        conn = self.db()
+        conn.execute("INSERT INTO vehicles (name, plate_number, current_location) VALUES (?,?,?)", (name, plate, location))
+        conn.commit()
+        row = conn.execute("SELECT * FROM vehicles WHERE id=?", (conn.execute("SELECT last_insert_rowid()").fetchone()[0],)).fetchone()
+        conn.close()
+        return dict(row)
+
+    async def update_vehicle_location(self, vehicle_id: int, body: dict):
+        location = body.get("current_location", "").strip()
+        allowed = ["Inside the factory","Outside the factory","On the way there","On the way back","At the location"]
+        if location not in allowed:
+            raise HTTPException(400, "Invalid location")
+        conn = self.db()
+        existing = conn.execute("SELECT * FROM vehicles WHERE id=?", (vehicle_id,)).fetchone()
+        if not existing:
+            conn.close()
+            raise HTTPException(404, "Vehicle not found")
+        conn.execute("UPDATE vehicles SET current_location=?, updated_at=datetime('now') WHERE id=?", (location, vehicle_id))
+        conn.commit()
+        row = conn.execute("SELECT * FROM vehicles WHERE id=?", (vehicle_id,)).fetchone()
+        conn.close()
+        return dict(row)
+
+    async def delete_vehicle(self, vehicle_id: int):
+        conn = self.db()
+        conn.execute("DELETE FROM vehicles WHERE id=?", (vehicle_id,))
+        conn.commit()
+        conn.close()
+        return {"ok": True}
+
     # ─── Ostool Operations ───
     def _ostool_where(self):
         return "(d.transportation_company LIKE '%ostool%' OR d.transportation_company LIKE '%Ostool%' OR d.transportation_company LIKE '%اسطول%')"
@@ -1386,7 +1444,7 @@ async def control_room(request: Request):
 
 @app.get("/api/dashboard-summary")
 async def dashboard_summary():
-    async def fetch_branch_items(branch):
+    async def fetch_branch_data(branch):
         try:
             db_path = Path(branch + ".db")
             conn = sqlite3.connect(str(db_path))
@@ -1394,12 +1452,19 @@ async def dashboard_summary():
             rows = conn.execute("SELECT * FROM items WHERE archived=0 ORDER BY name").fetchall()
             low = [dict(r) for r in rows if r["current_stock"] <= r["warning_threshold"]]
             total = sum(r["current_stock"] for r in rows)
+            vehicles = conn.execute("SELECT * FROM vehicles ORDER BY name").fetchall()
             conn.close()
-            return {"branch": branch, "items": [dict(r) for r in rows], "alerts": low, "total_stock": total}
+            return {
+                "branch": branch,
+                "items": [dict(r) for r in rows],
+                "alerts": low,
+                "total_stock": total,
+                "vehicles": [dict(r) for r in vehicles],
+            }
         except:
-            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0}
-    bani_data = await fetch_branch_items("bani")
-    alex_data = await fetch_branch_items("alex")
+            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0, "vehicles": []}
+    bani_data = await fetch_branch_data("bani")
+    alex_data = await fetch_branch_data("alex")
     return {
         "bani": bani_data,
         "alex": alex_data,

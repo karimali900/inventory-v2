@@ -18,7 +18,7 @@
         .stats-row { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
         .stats-row-2 { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
         .chart-wrap { width: 100%; background: rgba(15,23,42,0.6); border: 1px solid #1e293b; border-radius: 12px; padding: 12px; position: relative; }
-        .bottom-row { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .bottom-row { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
         #clock { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: bold; color: #fbbf24; letter-spacing: 0.08em; }
         .stat-label { font-size: 0.8rem; letter-spacing: 0.05em; }
         .stat-value { font-size: clamp(1.4rem, 3vw, 2.2rem); font-weight: bold; }
@@ -37,6 +37,7 @@
             .dash-layout { padding: 12px; gap: 10px; }
             .stats-row { grid-template-columns: repeat(2, 1fr); }
             .stats-row-2 { grid-template-columns: repeat(2, 1fr); }
+            .bottom-row { grid-template-columns: 1fr; }
             .bottom-row { grid-template-columns: 1fr; }
             .stat-box { padding: 10px 14px; }
         }
@@ -81,6 +82,10 @@
                 <div class="section-title font-bold text-sky-400 uppercase tracking-wider" id="overview-heading">📊 Overview</div>
                 <div id="overview-list" class="flex flex-col gap-2 overflow-y-auto" style="max-height:200px;"></div>
             </div>
+            <div class="flex flex-col gap-2">
+                <div class="section-title font-bold text-emerald-400 uppercase tracking-wider" id="vehicles-heading">🚛 Vehicles</div>
+                <div id="vehicles-list" class="flex flex-col gap-2 overflow-y-auto" style="max-height:200px;"></div>
+            </div>
         </div>
     </div>
 
@@ -98,19 +103,25 @@
                 title: '🚀 Control Room',
                 clock: '🕐', back: '← Back', langBtn: 'عربي',
                 netStock: 'Net Stock (ton)', baniStock: 'Bani (ton)', alexStock: 'Alex (ton)', items: 'Items', alerts: 'Alerts', online: 'Online',
-                alertsTitle: '🚨 Alerts', overview: '📊 Overview',
+                alertsTitle: '🚨 Alerts', overview: '📊 Overview', vehiclesTitle: '🚛 Vehicles',
                 allNormal: '✅ All stock levels normal',
                 threshold: 'Threshold', outOfStock: 'OUT OF STOCK', low: 'LOW',
                 usersOnline: 'Users Online', none: 'None', lowStock: 'LOW STOCK',
+                insideFactory: 'Inside the factory', outsideFactory: 'Outside the factory',
+                onWayThere: 'On the way there', onWayBack: 'On the way back', atLocation: 'At the location',
+                noVehicles: 'No vehicles',
             },
             ar: {
                 title: '🚀 غرفة التحكم',
                 clock: '🕐', back: '← رجوع', langBtn: 'English',
                 netStock: 'صافى المخزون (طن)', baniStock: 'بنى سويف (طن)', alexStock: 'الإسكندرية (طن)', items: 'الأصناف', alerts: 'إنذارات', online: 'متصلين',
-                alertsTitle: '🚨 إنذارات', overview: '📊 نظرة عامة',
+                alertsTitle: '🚨 إنذارات', overview: '📊 نظرة عامة', vehiclesTitle: '🚛 سيارات الاسطول',
                 allNormal: '✅ كل الأصناف طبيعية',
                 threshold: 'حد الإنذار', outOfStock: 'نفذ من المخزون', low: 'منخفض',
                 usersOnline: 'المستخدمين المتصلين', none: 'لا يوجد', lowStock: 'مخزون منخفض',
+                insideFactory: 'داخل المصنع', outsideFactory: 'خارج المصنع',
+                onWayThere: 'في الطريق هناك', onWayBack: 'في طريق العودة', atLocation: 'في الموقع',
+                noVehicles: 'لا توجد سيارات',
             }
         };
 
@@ -128,6 +139,7 @@
             document.getElementById('label-online').textContent = t('online');
             document.getElementById('alerts-heading').textContent = t('alertsTitle');
             document.getElementById('overview-heading').textContent = t('overview');
+            document.getElementById('vehicles-heading').textContent = t('vehiclesTitle');
             document.body.classList.toggle('rtl', currentLang === 'ar');
             if (lastData) renderDashboard(lastData);
         }
@@ -287,6 +299,36 @@
                     showToast('🚨 ' + a.name + ' — ' + t('lowStock') + ' (' + Number(a.current_stock).toFixed(1) + ' ' + a.branch + ')'));
             }
             prevAlerts = allAlerts;
+
+            // ─── Vehicles ───
+            const allVehicles = [
+                ...(data.bani?.vehicles || []).map(v => ({...v, branch: 'bani'})),
+                ...(data.alex?.vehicles || []).map(v => ({...v, branch: 'alex'})),
+            ];
+            const vehEl = document.getElementById('vehicles-list');
+            if (!allVehicles.length) {
+                vehEl.innerHTML = '<div class="text-slate-500 text-center py-6" style="font-size:1rem;">' + t('noVehicles') + '</div>';
+            } else {
+                const locStyles = {
+                    'Inside the factory': 'bg-emerald-500',
+                    'Outside the factory': 'bg-amber-500',
+                    'On the way there': 'bg-sky-500',
+                    'On the way back': 'bg-purple-500',
+                    'At the location': 'bg-rose-500',
+                };
+                vehEl.innerHTML = allVehicles.map(v => {
+                    const locKey = v.current_location;
+                    const locLabel = t(locKey === 'Inside the factory' ? 'insideFactory' : locKey === 'Outside the factory' ? 'outsideFactory' : locKey === 'On the way there' ? 'onWayThere' : locKey === 'On the way back' ? 'onWayBack' : 'atLocation');
+                    const dot = locStyles[locKey] || 'bg-slate-500';
+                    return '<div class="stat-box" style="padding:10px 14px;display:flex;align-items:center;gap:10px;">' +
+                        '<span class="w-2.5 h-2.5 rounded-full ' + dot + ' flex-shrink-0"></span>' +
+                        '<div style="flex:1;min-width:0;"><div class="font-bold text-white" style="font-size:clamp(0.85rem,1.5vw,1.1rem);">' + esc(v.name) + '</div>' +
+                        '<div style="font-size:0.7rem;color:#94a3b8;">' + esc(v.plate_number || '—') + ' · [' + esc(v.branch) + ']</div></div>' +
+                        '<span style="font-size:0.75rem;color:' + (locKey === 'Inside the factory' ? '#34d399' : locKey === 'Outside the factory' ? '#f59e0b' : locKey === 'On the way there' ? '#38bdf8' : locKey === 'On the way back' ? '#c084fc' : '#fb7185') + ';font-weight:600;text-align:right;flex-shrink:0;">' + locLabel + '</span>' +
+                        '</div>';
+                }).join('');
+            }
+
             document.getElementById('last-updated-monitor').textContent = t('clock') + ' ' + new Date().toLocaleTimeString();
             buildChart(data);
         }

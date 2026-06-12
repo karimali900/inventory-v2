@@ -167,6 +167,7 @@
             <button onclick="switchMainTab('reports')" id="tab-main-reports" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="reports">📊 Reports</button>
             <button onclick="switchMainTab('contacts')" id="tab-main-contacts" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="contacts">📞 Contacts</button>
             <button onclick="switchMainTab('gps')" id="tab-main-gps" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="gps">🛰️ GPS</button>
+            <button onclick="switchMainTab('vehicles')" id="tab-main-vehicles" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="vehicles">🚛 Vehicles</button>
             <button onclick="switchMainTab('cement-news')" id="tab-main-cement-news" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="cementNews">🏭 Cement News</button>
             <button onclick="switchMainTab('ostool')" id="tab-main-ostool" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="ostool">🚛 Ostool Operation</button>
             <button onclick="switchMainTab('users')" id="tab-main-users" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="users" style="display:none">👥 Users</button>
@@ -234,6 +235,20 @@
                 <h3 class="text-lg font-bold text-amber-400 mb-4" data-i18n="gps">🛰️ GPS Tracker</h3>
                 <p class="text-slate-400 text-sm mb-6">Click the button below to open the Altair GPS tracking system in a new tab.</p>
                 <a href="https://altair.ostool-eg.com/" target="_blank" rel="noopener noreferrer" class="inline-block bg-amber-600 hover:bg-amber-500 text-white px-6 py-3 rounded-lg text-sm font-bold transition">🔗 <span data-i18n="gps">🛰️ GPS Tracker</span></a>
+            </div>
+        </div>
+
+        <div id="tab-vehicles-content" class="hidden">
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
+                <div class="flex flex-wrap gap-2 mb-3 items-center">
+                    <input id="vehicle-name" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[140px]" placeholder="Vehicle Name">
+                    <input id="vehicle-plate" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[100px]" placeholder="Plate #">
+                    <button onclick="addVehicle()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition">➕ Add Vehicle</button>
+                    <a href="https://altair.ostool-eg.com/" target="_blank" rel="noopener noreferrer" class="bg-sky-700 hover:bg-sky-600 text-white px-4 py-2 rounded text-sm font-bold transition">🛰️ GPS</a>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-4 border border-slate-600">
+                <div id="vehicles-list" class="text-xs text-slate-400"><div class="skeleton h-3 w-3/4 my-1"></div></div>
             </div>
         </div>
 
@@ -795,6 +810,18 @@
                 reportSent: 'Report sent successfully!',
                 reportFailed: 'Failed to send report:',
                 gps: '🛰️ GPS Tracker',
+                vehicles: '🚛 Vehicles',
+                vehicleName: 'Vehicle Name',
+                vehiclePlate: 'Plate #',
+                vehicleLocation: 'Location',
+                vehicleUpdated: 'Updated',
+                addVehicle: '➕ Add Vehicle',
+                insideFactory: 'Inside the factory',
+                outsideFactory: 'Outside the factory',
+                onWayThere: 'On the way there',
+                onWayBack: 'On the way back',
+                atLocation: 'At the location',
+                noVehicles: 'No vehicles added yet.',
                 accounts: '💰 Station Accounts',
                 accountsStation: 'Station',
                 accountsItem: 'Item',
@@ -1008,6 +1035,18 @@
                 reportSent: 'تم إرسال التقرير بنجاح!',
                 reportFailed: 'فشل إرسال التقرير:',
                 gps: '🛰️ تتبع سيارات اسطول',
+                vehicles: '🚛 سيارات الاسطول',
+                vehicleName: 'اسم السيارة',
+                vehiclePlate: 'رقم اللوحة',
+                vehicleLocation: 'الموقع',
+                vehicleUpdated: 'آخر تحديث',
+                addVehicle: '➕ إضافة سيارة',
+                insideFactory: 'داخل المصنع',
+                outsideFactory: 'خارج المصنع',
+                onWayThere: 'في الطريق هناك',
+                onWayBack: 'في طريق العودة',
+                atLocation: 'في الموقع',
+                noVehicles: 'لا توجد سيارات مضافة بعد.',
                 accounts: '💰 حسابات المحطات',
                 accountsStation: 'المحطة',
                 accountsItem: 'الصنف',
@@ -1186,6 +1225,7 @@
             const hist = document.getElementById('tab-history-content');
             const rep = document.getElementById('tab-reports-content');
             const gps = document.getElementById('tab-gps-content');
+            const veh = document.getElementById('tab-vehicles-content');
             const acc = document.getElementById('tab-accounts-content');
             const ord = document.getElementById('tab-orders-content');
             const cnw = document.getElementById('tab-cement-news-content');
@@ -1196,14 +1236,15 @@
             const btnHist = document.getElementById('tab-main-history');
             const btnRep = document.getElementById('tab-main-reports');
             const btnGps = document.getElementById('tab-main-gps');
+            const btnVeh = document.getElementById('tab-main-vehicles');
             const btnAcc = document.getElementById('tab-main-accounts');
             const btnOrd = document.getElementById('tab-main-orders');
             const btnCnw = document.getElementById('tab-main-cement-news');
             const btnCnt = document.getElementById('tab-main-contacts');
             const btnOst = document.getElementById('tab-main-ostool');
             const btnUsr = document.getElementById('tab-main-users');
-            [inv, hist, rep, gps, acc, ord, cnw, cnt, ost, usr].forEach(el => el && el.classList.add('hidden'));
-            [btnInv, btnHist, btnRep, btnGps, btnAcc, btnOrd, btnCnw, btnCnt, btnOst, btnUsr].forEach(el => {
+            [inv, hist, rep, gps, veh, acc, ord, cnw, cnt, ost, usr].forEach(el => el && el.classList.add('hidden'));
+            [btnInv, btnHist, btnRep, btnGps, btnVeh, btnAcc, btnOrd, btnCnw, btnCnt, btnOst, btnUsr].forEach(el => {
                 if (el) el.className = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition';
             });
             if (tab === 'inventory') {
@@ -1216,6 +1257,10 @@
             } else if (tab === 'gps') {
                 gps.classList.remove('hidden');
                 btnGps.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+            } else if (tab === 'vehicles') {
+                veh.classList.remove('hidden');
+                btnVeh.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadVehicles();
             } else if (tab === 'orders') {
                 ord.classList.remove('hidden');
                 btnOrd.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
@@ -1664,6 +1709,78 @@
             try {
                 await fetch('/api/inventory/contacts/' + id, {method: 'DELETE'});
                 loadContacts();
+            } catch { alert(t('error')); }
+        }
+
+        // ─── Vehicles ───
+        async function loadVehicles() {
+            const el = document.getElementById('vehicles-list');
+            try {
+                const res = await fetch('/api/inventory/vehicles');
+                const data = await res.json();
+                if (!data.length) {
+                    el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noVehicles') + '</p>';
+                    return;
+                }
+                const locs = ['Inside the factory','Outside the factory','On the way there','On the way back','At the location'];
+                let html = '<table class="w-full text-left"><thead><tr class="text-slate-400 border-b border-slate-700">' +
+                    '<th class="py-2 px-2">' + t('vehicleName') + '</th>' +
+                    '<th class="py-2 px-2">' + t('vehiclePlate') + '</th>' +
+                    '<th class="py-2 px-2">' + t('vehicleLocation') + '</th>' +
+                    '<th class="py-2 px-2">' + t('vehicleUpdated') + '</th>' +
+                    '<th class="py-2 px-2"></th></tr></thead><tbody>';
+                data.forEach(v => {
+                    html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
+                        '<td class="py-2 px-2 font-bold text-amber-400">' + esc(v.name) + '</td>' +
+                        '<td class="py-2 px-2 text-slate-300">' + esc(v.plate_number || '—') + '</td>' +
+                        '<td class="py-2 px-2"><select onchange="updateVehicleLocation(' + v.id + ',this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs">';
+                    locs.forEach(l => {
+                        html += '<option value="' + l + '"' + (v.current_location === l ? ' selected' : '') + '>' + t(l === 'Inside the factory' ? 'insideFactory' : l === 'Outside the factory' ? 'outsideFactory' : l === 'On the way there' ? 'onWayThere' : l === 'On the way back' ? 'onWayBack' : 'atLocation') + '</option>';
+                    });
+                    html += '</select></td>' +
+                        '<td class="py-2 px-2 text-slate-500 text-[10px]">' + (v.updated_at ? new Date(v.updated_at + 'Z').toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US') : '—') + '</td>' +
+                        '<td class="py-2 px-2 text-right"><button onclick="deleteVehicle(' + v.id + ')" class="text-red-400 hover:text-red-300 text-xs">' + t('delete') + '</button></td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading vehicles</p>'; }
+        }
+
+        async function updateVehicleLocation(id, location) {
+            try {
+                const res = await fetch('/api/inventory/vehicles/' + id + '/location', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({current_location: location})
+                });
+                if (res.ok) { loadVehicles(); toast(t('updated')); }
+                else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        async function addVehicle() {
+            const name = document.getElementById('vehicle-name').value.trim();
+            const plate = document.getElementById('vehicle-plate').value.trim();
+            if (!name) { alert(t('error')); return; }
+            try {
+                const res = await fetch('/api/inventory/vehicles', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, plate_number: plate})
+                });
+                if (res.ok) {
+                    document.getElementById('vehicle-name').value = '';
+                    document.getElementById('vehicle-plate').value = '';
+                    loadVehicles();
+                } else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
+        }
+
+        async function deleteVehicle(id) {
+            try {
+                await fetch('/api/inventory/vehicles/' + id, {method: 'DELETE'});
+                loadVehicles();
             } catch { alert(t('error')); }
         }
 
