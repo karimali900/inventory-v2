@@ -76,6 +76,50 @@
         .skeleton { background: linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(71,85,105,0.5) 50%, rgba(51,65,85,0.5) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .num-animate { transition: color 0.5s ease; }
+        /* Chat Panel */
+        #chat-panel { position: fixed; bottom: 36px; right: 8px; width: 320px; max-height: 420px; z-index: 99; display: none; flex-direction: column; border-radius: 12px; overflow: hidden; }
+        #chat-panel.show { display: flex; }
+        #chat-panel .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(30,41,59,0.95); border-bottom: 1px solid #334155; }
+        #chat-panel .chat-tabs { display: flex; gap: 4px; }
+        #chat-panel .chat-tab { padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; color: #94a3b8; background: transparent; border: none; }
+        #chat-panel .chat-tab.active { color: #fbbf24; background: rgba(251,191,36,0.15); }
+        #chat-panel .chat-body { flex: 1; overflow-y: auto; padding: 8px; min-height: 200px; max-height: 320px; background: rgba(15,23,42,0.9); }
+        #chat-panel .chat-footer { padding: 8px; background: rgba(30,41,59,0.95); border-top: 1px solid #334155; display: flex; gap: 6px; }
+        #chat-panel .chat-footer input { flex: 1; background: #1e293b; border: 1px solid #475569; border-radius: 6px; padding: 6px 10px; color: #fff; font-size: 12px; outline: none; }
+        #chat-panel .chat-footer input:focus { border-color: #f59e0b; }
+        #chat-panel .chat-footer button { background: #0284c7; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: bold; }
+        #chat-panel .chat-footer button:hover { background: #0369a1; }
+        .chat-msg { margin-bottom: 6px; padding: 6px 10px; border-radius: 8px; font-size: 12px; max-width: 85%; word-break: break-word; }
+        .chat-msg.mine { background: rgba(2,132,199,0.3); border: 1px solid rgba(2,132,199,0.4); margin-left: auto; }
+        .chat-msg.other { background: rgba(30,41,59,0.8); border: 1px solid #334155; }
+        .chat-msg .sender { font-weight: bold; color: #fbbf24; font-size: 10px; margin-bottom: 2px; }
+        .chat-msg .time { font-size: 9px; color: #64748b; text-align: right; margin-top: 2px; }
+        .chat-user { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid #1e293b; }
+        .chat-user .name { font-size: 12px; font-weight: bold; color: #e2e8f0; }
+        .chat-user .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .chat-user .dot.online { background: #34d399; }
+        .chat-user .call-btn { background: #059669; color: #fff; border: none; border-radius: 4px; padding: 3px 8px; font-size: 10px; cursor: pointer; }
+        .chat-user .call-btn:hover { background: #047857; }
+        .chat-user .call-btn.video { background: #7c3aed; margin-left: 4px; }
+        .chat-user .call-btn.video:hover { background: #6d28d9; }
+        #chat-toggle { position: fixed; bottom: 36px; right: 60px; width: 32px; height: 32px; border-radius: 50%; background: #0284c7; color: #fff; font-size: 14px; border: none; cursor: pointer; z-index: 99; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s ease; }
+        #chat-toggle:hover { background: #0369a1; transform: scale(1.1); }
+        #chat-toggle.has-unread { animation: pulse-glow 1s infinite; }
+        @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 4px rgba(2,132,199,0.5); } 50% { box-shadow: 0 0 12px rgba(2,132,199,0.8); } }
+        /* Call Modal */
+        #call-modal .call-video { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 240px; display: flex; align-items: center; justify-content: center; }
+        #call-modal .call-video video { width: 100%; height: 100%; object-fit: contain; }
+        #call-modal .local-video { position: absolute; bottom: 8px; right: 8px; width: 120px; height: 90px; border-radius: 8px; overflow: hidden; border: 2px solid #475569; background: #000; }
+        #call-modal .local-video video { width: 100%; height: 100%; object-fit: cover; }
+        #call-modal .call-controls { display: flex; justify-content: center; gap: 16px; padding: 12px; }
+        #call-modal .call-controls button { width: 44px; height: 44px; border-radius: 50%; border: none; font-size: 18px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; }
+        #call-modal .call-controls .hangup { background: #dc2626; color: #fff; }
+        #call-modal .call-controls .hangup:hover { background: #b91c1c; }
+        #call-modal .call-controls .toggle { background: #334155; color: #fff; }
+        #call-modal .call-controls .toggle:hover { background: #475569; }
+        #call-modal .call-controls .toggle.muted { background: #dc2626; }
+        #call-modal .call-info { text-align: center; padding: 8px; font-size: 12px; color: #94a3b8; }
+
         /* Mobile optimizations */
         * { -webkit-tap-highlight-color: transparent; }
         html { overscroll-behavior: none; }
@@ -93,6 +137,8 @@
             table th, table td { padding: 4px 6px !important; }
             .status-bar { font-size: 10px !important; gap: 8px !important; padding: 4px 8px !important; }
             #scroll-top-btn { bottom: 48px; right: 8px; width: 34px; height: 34px; font-size: 16px; }
+            #chat-toggle { right: 48px; bottom: 48px; width: 28px; height: 28px; font-size: 12px; }
+            #chat-panel { right: 4px; width: calc(100vw - 8px); max-height: 50vh; }
         }
     </style>
 </head>
@@ -451,6 +497,37 @@
 
         <div id="toast-container" class="toast-container"></div>
         <button id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+        <button id="chat-toggle" onclick="toggleChat()" title="Chat" style="background:#0284c7;">💬</button>
+        <div id="chat-panel" class="glass">
+            <div class="chat-header">
+                <span class="text-xs font-bold text-sky-400" data-i18n="chat">💬 Chat</span>
+                <div class="chat-tabs">
+                    <button class="chat-tab active" onclick="switchChatTab('users',this)" data-i18n="chatUsers">Users</button>
+                    <button class="chat-tab" onclick="switchChatTab('messages',this)" data-i18n="messages">Messages</button>
+                </div>
+            </div>
+            <div id="chat-users" class="chat-body"></div>
+            <div id="chat-messages" class="chat-body" style="display:none;"></div>
+            <div class="chat-footer">
+                <input id="chat-input" data-i18n-placeholder="chatPlaceholder" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChat()">
+                <button onclick="sendChat()" data-i18n="send">Send</button>
+            </div>
+        </div>
+        <div id="call-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+            <div class="glass rounded-xl p-4 w-full max-w-lg border border-slate-600">
+                <div class="call-video">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <div id="call-status" class="absolute inset-0 flex items-center justify-center text-slate-400 text-sm"></div>
+                    <div class="local-video"><video id="local-video" autoplay playsinline muted></video></div>
+                </div>
+                <div class="call-info" id="call-info"></div>
+                <div class="call-controls">
+                    <button class="toggle" id="call-mute-btn" onclick="toggleMute()" title="Mute">🎤</button>
+                    <button class="toggle" id="call-video-btn" onclick="toggleCallVideo()" title="Camera">📷</button>
+                    <button class="hangup" onclick="endCall()" title="Hang Up">📞</button>
+                </div>
+            </div>
+        </div>
 
     <div id="create-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div class="glass rounded-xl p-6 w-full max-w-md border border-slate-600">
@@ -811,6 +888,22 @@
                 onlineUsers: '👤 Online:',
                 editContact: '✏️ Edit Contact',
                 updated: '✅ Updated',
+                chat: '💬 Chat',
+                chatUsers: 'Users',
+                messages: 'Messages',
+                send: 'Send',
+                noUsers: 'No other users online',
+                noMessages: 'No messages yet',
+                chatPlaceholder: 'Type a message...',
+                callIncoming: 'Incoming call from',
+                callOutgoing: 'Calling',
+                callActive: 'Call active',
+                callEnded: 'Call ended',
+                callDeclined: 'Call declined',
+                callFailed: 'Call failed',
+                micUnavailable: 'Microphone not available',
+                camUnavailable: 'Camera not available',
+                you: 'You',
             },
             ar: {
                 pageTitle: 'حركة مخزون اسمنت بنى سويف | ميزان حركة المخزون',
@@ -1007,6 +1100,22 @@
                 onlineUsers: '👤 المتصلين:',
                 editContact: '✏️ تعديل',
                 updated: '✅ تم التحديث',
+                chat: '💬 الدردشة',
+                chatUsers: 'المستخدمين',
+                messages: 'الرسائل',
+                send: 'إرسال',
+                noUsers: 'لا يوجد مستخدمين آخرين متصلين',
+                noMessages: 'لا توجد رسائل بعد',
+                chatPlaceholder: 'اكتب رسالة...',
+                callIncoming: 'مكالمة واردة من',
+                callOutgoing: 'جارٍ الاتصال بـ',
+                callActive: 'المكالمة نشطة',
+                callEnded: 'انتهت المكالمة',
+                callDeclined: 'تم رفض المكالمة',
+                callFailed: 'فشلت المكالمة',
+                micUnavailable: 'الميكروفون غير متاح',
+                camUnavailable: 'الكاميرا غير متاحة',
+                you: 'أنت',
             }
         };
 
@@ -2490,6 +2599,315 @@
             if (el) el.textContent = '🕐 ' + new Date().toLocaleTimeString();
         }
 
+        // ─── Chat & Calls ─────────────────────────────────────────
+        let chatWs = null;
+        let chatConnected = false;
+        let chatUnread = 0;
+        let currentChatUser = null;
+        let chatBranch = window.location.pathname.split('/')[1] || 'bani';
+        let pc = null;
+        let localStream = null;
+        let remoteStream = null;
+        let callActive = false;
+        let callIncoming = false;
+        let callOffer = null;
+
+        function getChatToken() {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+            return document.cookie.split('; ').find(r=>r.startsWith('token='))?.split('=')[1] || '';
+        }
+
+        function connectChat() {
+            if (chatWs && (chatWs.readyState === WebSocket.OPEN || chatWs.readyState === WebSocket.CONNECTING)) return;
+            const token = getChatToken();
+            if (!token) return;
+            try {
+                const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const host = window.location.host;
+                chatWs = new WebSocket(proto + '//' + host + '/ws/chat/' + chatBranch + '?token=' + encodeURIComponent(token));
+                chatWs.onopen = () => { chatConnected = true; };
+                chatWs.onclose = () => { chatConnected = false; chatWs = null; setTimeout(connectChat, 5000); };
+                chatWs.onmessage = e => {
+                    try {
+                        const msg = JSON.parse(e.data);
+                        handleChatMessage(msg);
+                    } catch {}
+                };
+                chatWs.onerror = () => {};
+            } catch {}
+        }
+
+        function handleChatMessage(msg) {
+            const type = msg.type;
+            if (type === 'user-list') {
+                renderChatUsers(msg.users);
+            } else if (type === 'chat') {
+                appendChatMessage(msg.from, msg.text, msg.timestamp, false);
+                if (document.getElementById('chat-panel').classList.contains('show') === false || document.getElementById('chat-messages').style.display !== 'block') {
+                    chatUnread++;
+                    document.getElementById('chat-toggle').classList.add('has-unread');
+                }
+            } else if (type === 'call-request') {
+                callIncoming = true;
+                callOffer = msg;
+                if (confirm(t('callIncoming') + ' ' + msg.from + '?')) {
+                    acceptCall(msg.from);
+                } else {
+                    sendWsMsg({type: 'call-decline', to: msg.from});
+                }
+            } else if (type === 'call-accept') {
+                document.getElementById('call-status').textContent = t('callActive');
+                document.getElementById('call-info').textContent = t('callActive') + ' ' + msg.from;
+                callActive = true;
+                document.getElementById('call-modal').classList.remove('hidden');
+                document.getElementById('call-modal').classList.add('flex');
+            } else if (type === 'call-decline') {
+                alert(t('callDeclined'));
+                cleanupCall();
+            } else if (type === 'call-end') {
+                alert(t('callEnded'));
+                cleanupCall();
+            } else if (type === 'offer') {
+                handleOffer(msg);
+            } else if (type === 'answer') {
+                handleAnswer(msg);
+            } else if (type === 'ice-candidate') {
+                handleIceCandidate(msg);
+            }
+        }
+
+        function renderChatUsers(users) {
+            const el = document.getElementById('chat-users');
+            const me = localStorage.getItem('username') || 'admin';
+            const others = users.filter(u => u.username !== me);
+            if (!others.length) {
+                el.innerHTML = '<div class="text-slate-500 text-center py-8 text-xs">' + t('noUsers') + '</div>';
+                return;
+            }
+            el.innerHTML = others.map(u => {
+                const hasMic = checkMedia('audio');
+                const hasCam = checkMedia('video');
+                return '<div class="chat-user">' +
+                    '<span class="name"><span class="dot online"></span>' + esc(u.username) + '</span>' +
+                    '<div>' +
+                    (hasMic ? '<button class="call-btn" onclick="startCall(\'' + u.username + '\',false)" title="Audio">📞</button>' : '<button class="call-btn" onclick="startCall(\'' + u.username + '\',false)" title="Audio only">📞</button>') +
+                    (hasCam ? '<button class="call-btn video" onclick="startCall(\'' + u.username + '\',true)" title="Video">📹</button>' : '') +
+                    '</div></div>';
+            }).join('');
+        }
+
+        function appendChatMessage(from, text, timestamp, isMine) {
+            const el = document.getElementById('chat-messages');
+            if (!el) return;
+            const time = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + (isMine ? 'mine' : 'other');
+            div.innerHTML = '<div class="sender">' + (isMine ? t('you') : esc(from)) + '</div>' +
+                '<div>' + esc(text) + '</div>' +
+                '<div class="time">' + time + '</div>';
+            el.appendChild(div);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text || !chatWs || chatWs.readyState !== WebSocket.OPEN) return;
+            const target = currentChatUser;
+            if (!target) { toast(t('error')); return; }
+            sendWsMsg({type: 'chat', to: target, text});
+            appendChatMessage(localStorage.getItem('username') || 'me', text, null, true);
+            input.value = '';
+        }
+
+        function sendWsMsg(data) {
+            if (chatWs && chatWs.readyState === WebSocket.OPEN) {
+                chatWs.send(JSON.stringify(data));
+            }
+        }
+
+        function switchChatTab(tab, btn) {
+            document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('chat-users').style.display = tab === 'users' ? 'block' : 'none';
+            document.getElementById('chat-messages').style.display = tab === 'messages' ? 'block' : 'none';
+            if (tab === 'messages') chatUnread = 0;
+            document.getElementById('chat-toggle').classList.remove('has-unread');
+        }
+
+        function toggleChat() {
+            const panel = document.getElementById('chat-panel');
+            panel.classList.toggle('show');
+            if (panel.classList.contains('show')) {
+                chatUnread = 0;
+                document.getElementById('chat-toggle').classList.remove('has-unread');
+                if (!chatConnected) connectChat();
+            }
+        }
+
+        // ─── Media Checks ──────────────────────────────────────────
+        let _mediaCache = null;
+        async function checkMedia(kind) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return false;
+            try {
+                if (!_mediaCache) _mediaCache = await navigator.mediaDevices.enumerateDevices();
+                return _mediaCache.some(d => d.kind === kind + 'input' && d.deviceId);
+            } catch { return false; }
+        }
+
+        // ─── WebRTC Calls ──────────────────────────────────────────
+        async function getMedia(video) {
+            try {
+                const hasMic = await checkMedia('audio');
+                const hasCam = video && await checkMedia('video');
+                if (!hasMic) { toast(t('micUnavailable')); return null; }
+                if (video && !hasCam) { toast(t('camUnavailable')); video = false; }
+                const constraints = {audio: hasMic ? {echoCancellation: true, noiseSuppression: true} : false};
+                if (video && hasCam) constraints.video = {width: {ideal: 640}, height: {ideal: 480}};
+                return await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (e) {
+                if (e.name === 'NotFoundError') toast(t('micUnavailable'));
+                else toast(t('callFailed'));
+                return null;
+            }
+        }
+
+        async function startCall(username, video) {
+            if (callActive) { toast(t('callActive')); return; }
+            const stream = await getMedia(video);
+            if (!stream) return;
+            localStream = stream;
+            currentChatUser = username;
+            document.getElementById('local-video').srcObject = stream;
+            document.getElementById('call-status').textContent = t('callOutgoing') + ' ' + username;
+            document.getElementById('call-info').textContent = t('callOutgoing') + ' ' + username;
+            document.getElementById('call-modal').classList.remove('hidden');
+            document.getElementById('call-modal').classList.add('flex');
+            sendWsMsg({type: 'call-request', to: username, video});
+            createPeerConnection(username);
+            stream.getTracks().forEach(t => pc.addTrack(t, stream));
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendWsMsg({type: 'offer', to: username, sdp: pc.localDescription});
+            } catch {}
+        }
+
+        async function acceptCall(username) {
+            const video = callOffer.video;
+            const stream = await getMedia(video);
+            if (!stream) { sendWsMsg({type: 'call-decline', to: username}); return; }
+            localStream = stream;
+            currentChatUser = username;
+            document.getElementById('local-video').srcObject = stream;
+            document.getElementById('call-status').textContent = t('callActive');
+            document.getElementById('call-info').textContent = t('callActive') + ' ' + username;
+            document.getElementById('call-modal').classList.remove('hidden');
+            document.getElementById('call-modal').classList.add('flex');
+            sendWsMsg({type: 'call-accept', to: username});
+            createPeerConnection(username);
+            stream.getTracks().forEach(t => pc.addTrack(t, stream));
+            if (pc.remoteDescription && !pc.currentRemoteDescription) {
+                try {
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    sendWsMsg({type: 'answer', to: username, sdp: pc.localDescription});
+                } catch {}
+            }
+            callIncoming = false;
+            callActive = true;
+        }
+
+        function createPeerConnection(username) {
+            const cfg = {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]};
+            pc = new RTCPeerConnection(cfg);
+            pc.onicecandidate = e => {
+                if (e.candidate) sendWsMsg({type: 'ice-candidate', to: username, candidate: e.candidate});
+            };
+            pc.ontrack = e => {
+                if (!remoteStream) {
+                    remoteStream = new MediaStream();
+                    document.getElementById('remote-video').srcObject = remoteStream;
+                }
+                e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+                document.getElementById('call-status').textContent = '';
+            };
+            pc.onconnectionstatechange = () => {
+                if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+                    toast(t('callEnded'));
+                    cleanupCall();
+                }
+            };
+        }
+
+        function handleOffer(msg) {
+            if (!pc) {
+                createPeerConnection(msg.from);
+                if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+            }
+            pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).then(async () => {
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                sendWsMsg({type: 'answer', to: msg.from, sdp: pc.localDescription});
+            }).catch(() => {});
+        }
+
+        function handleAnswer(msg) {
+            if (pc) pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).catch(() => {});
+        }
+
+        function handleIceCandidate(msg) {
+            if (pc && msg.candidate) {
+                pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
+            }
+        }
+
+        function toggleMute() {
+            if (!localStream) return;
+            const audio = localStream.getAudioTracks()[0];
+            if (audio) {
+                audio.enabled = !audio.enabled;
+                document.getElementById('call-mute-btn').classList.toggle('muted', !audio.enabled);
+                document.getElementById('call-mute-btn').textContent = audio.enabled ? '🎤' : '🔇';
+            }
+        }
+
+        function toggleCallVideo() {
+            if (!localStream) return;
+            const video = localStream.getVideoTracks()[0];
+            if (video) {
+                video.enabled = !video.enabled;
+                document.getElementById('call-video-btn').classList.toggle('muted', !video.enabled);
+                document.getElementById('call-video-btn').textContent = video.enabled ? '📷' : '🚫';
+            }
+        }
+
+        function endCall() {
+            if (currentChatUser) sendWsMsg({type: 'call-end', to: currentChatUser});
+            cleanupCall();
+        }
+
+        function cleanupCall() {
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+            remoteStream = null;
+            if (pc) pc.close();
+            pc = null;
+            callActive = false;
+            callIncoming = false;
+            callOffer = null;
+            currentChatUser = null;
+            document.getElementById('call-modal').classList.add('hidden');
+            document.getElementById('call-modal').classList.remove('flex');
+            document.getElementById('local-video').srcObject = null;
+            document.getElementById('remote-video').srcObject = null;
+            document.getElementById('call-mute-btn').classList.remove('muted');
+            document.getElementById('call-mute-btn').textContent = '🎤';
+            document.getElementById('call-video-btn').classList.remove('muted');
+            document.getElementById('call-video-btn').textContent = '📷';
+        }
+
         // ─── Click Sound ─────────────────────────────────────────
         let audioCtx = null;
         function playClick() {
@@ -2626,6 +3044,7 @@
         }).catch(() => {});
         loadActiveUsers();
         setInterval(loadActiveUsers, 10000);
+        connectChat();
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/static/sw.js').catch(() => {});
         }

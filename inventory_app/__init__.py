@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -72,6 +72,43 @@ def get_current_user(auth: HTTPAuthorizationCredentials = Depends(auth_scheme)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user
+
+# ─── WebSocket Chat Manager ───────────────────────────────────────
+class ConnectionManager:
+    def __init__(self):
+        self.connections: dict[str, dict[str, WebSocket]] = {}
+
+    def add(self, branch: str, username: str, ws: WebSocket):
+        if branch not in self.connections:
+            self.connections[branch] = {}
+        self.connections[branch][username] = ws
+
+    def remove(self, branch: str, username: str):
+        if branch in self.connections and username in self.connections[branch]:
+            del self.connections[branch][username]
+            if not self.connections[branch]:
+                del self.connections[branch]
+
+    def get_users(self, branch: str) -> list[dict]:
+        return [{"username": u} for u in self.connections.get(branch, {}).keys()]
+
+    async def broadcast(self, branch: str, message: dict, exclude: str = None):
+        for username, ws in list(self.connections.get(branch, {}).items()):
+            if username != exclude:
+                try:
+                    await ws.send_json(message)
+                except Exception:
+                    pass
+
+    async def send_to(self, branch: str, username: str, message: dict):
+        ws = self.connections.get(branch, {}).get(username)
+        if ws:
+            try:
+                await ws.send_json(message)
+            except Exception:
+                pass
+
+chat_manager = ConnectionManager()
 
 # ─── Active Sessions Tracking ──────────────────────────────────────
 active_sessions: dict = {}
@@ -1191,6 +1228,48 @@ from fastapi.staticfiles import StaticFiles
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+@app.websocket("/ws/chat/{branch}")
+async def chat_websocket(websocket: WebSocket, branch: str):
+    token = websocket.query_params.get("token")
+    user_info = verify_token(token) if token else None
+    if not user_info:
+        await websocket.close(code=4001)
+        return
+    username = user_info["username"]
+    await websocket.accept()
+    chat_manager.add(branch, username, websocket)
+    await chat_manager.broadcast(branch, {"type": "user-list", "users": chat_manager.get_users(branch)})
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+            if msg_type == "chat":
+                to = data.get("to")
+                text = data.get("text", "").strip()
+                if to and text:
+                    await chat_manager.send_to(branch, to, {
+                        "type": "chat", "from": username, "text": text,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+            elif msg_type in ("offer", "answer", "ice-candidate"):
+                to = data.get("to")
+                if to:
+                    data["from"] = username
+                    await chat_manager.send_to(branch, to, data)
+            elif msg_type in ("call-request", "call-accept", "call-decline", "call-end"):
+                to = data.get("to")
+                if to:
+                    data["from"] = username
+                    data["from_name"] = username
+                    await chat_manager.send_to(branch, to, data)
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        chat_manager.remove(branch, username)
+        await chat_manager.broadcast(branch, {"type": "user-list", "users": chat_manager.get_users(branch)})
 
 @app.post("/api/login")
 async def login(body: dict, request: Request):
