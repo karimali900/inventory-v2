@@ -1391,7 +1391,7 @@ async def dashboard_summary():
             db_path = Path(__file__).parent / f"{branch}.db"
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
-            rows = conn.execute("SELECT * FROM inventory_items WHERE archived=0 ORDER BY name").fetchall()
+            rows = conn.execute("SELECT * FROM items WHERE archived=0 ORDER BY name").fetchall()
             low = [dict(r) for r in rows if r["current_stock"] <= r["warning_threshold"]]
             total = sum(r["current_stock"] for r in rows)
             conn.close()
