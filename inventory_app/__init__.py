@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import smtplib
 import sqlite3
 import time
@@ -9,7 +10,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -72,6 +73,54 @@ def get_current_user(auth: HTTPAuthorizationCredentials = Depends(auth_scheme)):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user
 
+# ─── Active Sessions Tracking ──────────────────────────────────────
+active_sessions: dict = {}
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip", "")
+    if real_ip:
+        return real_ip.strip()
+    host, port = request.client.host, request.client.port
+    return host or "0.0.0.0"
+
+def is_private_ip(ip: str) -> bool:
+    ip = ip.strip()
+    if ip.startswith("127.") or ip == "localhost" or ip == "::1":
+        return True
+    if ip.startswith("192.168."):
+        return True
+    if ip.startswith("10."):
+        return True
+    if ip.startswith("172."):
+        try:
+            second = int(ip.split(".")[1])
+            if 16 <= second <= 31:
+                return True
+        except (IndexError, ValueError):
+            pass
+    return False
+
+def record_active_session(username: str, request: Request):
+    ip = get_client_ip(request)
+    network = "داخلى" if is_private_ip(ip) else "خارجى"
+    active_sessions[username] = {
+        "username": username,
+        "ip": ip,
+        "network": network,
+        "last_seen": datetime.utcnow().isoformat(),
+    }
+
+def cleanup_stale_sessions(max_minutes: int = 5):
+    cutoff = datetime.utcnow() - timedelta(minutes=max_minutes)
+    stale = [u for u, s in active_sessions.items()
+             if datetime.fromisoformat(s["last_seen"]) < cutoff]
+    for u in stale:
+        del active_sessions[u]
+
+# ─── .env ─────────────────────────────────────────────────────────
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -206,10 +255,10 @@ class InventoryBranch:
                 auth_header = request.headers.get("authorization")
                 if auth_header and auth_header.startswith("Bearer "):
                     token = auth_header[7:]
-                username = verify_token(token) if token else None
-                if not username:
-                    from fastapi.responses import JSONResponse
+                user_info = verify_token(token) if token else None
+                if not user_info:
                     return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+                record_active_session(user_info["username"], request)
             return await call_next(request)
 
         self.router.add_api_route("/", self.serve_html, response_class=HTMLResponse, methods=["GET"])
@@ -248,6 +297,7 @@ class InventoryBranch:
         self.router.add_api_route("/api/inventory/ostool-operations", self.get_ostool_operations, methods=["GET"])
         self.router.add_api_route("/api/inventory/ostool-operations/email", self.send_ostool_email, methods=["POST"])
         self.router.add_api_route("/api/inventory/distances-search", self.search_distances_files, methods=["GET"])
+        self.router.add_api_route("/api/active-users", self.get_active_users, methods=["GET"])
 
     def db(self):
         conn = sqlite3.connect(str(self.db_path))
@@ -630,6 +680,10 @@ class InventoryBranch:
         conn.close()
         return {"stations": [dict(r) for r in rows], "grand_total_weight": grand_total}
 
+    async def get_active_users(self):
+        cleanup_stale_sessions()
+        return {"users": list(active_sessions.values())}
+
     async def list_all_distributions(self, limit: int = 100):
         conn = self.db()
         rows = conn.execute(
@@ -664,7 +718,7 @@ class InventoryBranch:
         conn.execute("UPDATE items SET current_stock=?, updated_at=? WHERE id=?", (new_stock, now, item_id))
         conn.execute(
             "INSERT INTO transactions (item_id, type, quantity, previous_stock, new_stock, note, distribution_id, created_at) VALUES (?, 'distribution', ?, ?, ?, ?, ?, ?)",
-            (item_id, weight, prev, new_stock, f"Distribution to {dist['station']}", dist_id, now),
+            (item_id, weight, prev, new_stock,             dist['station'], dist_id, now),
         )
         conn.execute("UPDATE distributions SET status='completed' WHERE id=?", (dist_id,))
         conn.commit()
@@ -715,10 +769,15 @@ class InventoryBranch:
         conn.close()
         return {"items": items_data, "distributions_by_station": [dict(r) for r in dist_data], "recent": [dict(r) for r in recent], "report_date": date}
 
-    async def get_global_history(self, limit: int = 50, offset: int = 0):
+    async def get_global_history(self, station: str = "", limit: int = 50, offset: int = 0):
         conn = self.db()
+        where = ""
+        params = []
+        if station:
+            where = " WHERE (t.note LIKE ? OR t.note LIKE ?)"
+            params = [f"%{station}%", f"%{station}%"]
         rows = conn.execute(
-            """SELECT t.*, i.name as item_name,
+            f"""SELECT t.*, i.name as item_name,
                       CASE WHEN t.distribution_id IS NOT NULL
                         THEN (SELECT COUNT(*) FROM distributions d
                               WHERE d.item_id = t.item_id AND d.id <= t.distribution_id
@@ -726,10 +785,15 @@ class InventoryBranch:
                         ELSE NULL END as dist_num
                FROM transactions t
                JOIN items i ON i.id = t.item_id
+               {where}
                ORDER BY t.created_at DESC LIMIT ? OFFSET ?""",
-            (limit, offset),
+            params + [limit, offset],
         ).fetchall()
-        total = conn.execute("SELECT COUNT(*) as c FROM transactions").fetchone()["c"]
+        count_params = params[:] if station else []
+        total = conn.execute(
+            f"SELECT COUNT(*) as c FROM transactions t JOIN items i ON i.id = t.item_id {where}",
+            count_params,
+        ).fetchone()["c"]
         conn.close()
         return {"transactions": [dict(r) for r in rows], "total": total}
 
@@ -1120,7 +1184,7 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 @app.post("/api/login")
-async def login(body: dict):
+async def login(body: dict, request: Request):
     username = body.get("username", "").strip()
     password = body.get("password", "")
     conn = get_users_db()
@@ -1130,11 +1194,17 @@ async def login(body: dict):
         raise HTTPException(401, "Invalid username or password")
     role = user["role"] if "role" in dict(user) and user["role"] else "editor"
     token = create_access_token(username, role)
+    record_active_session(username, request)
     return {"token": token, "username": username, "role": role}
 
 @app.get("/api/test")
 async def test_api():
     return {"ok": True}
+
+@app.get("/api/active-users")
+async def get_active_users():
+    cleanup_stale_sessions()
+    return {"users": list(active_sessions.values())}
 
 @app.get("/api/users")
 async def list_users(auth: HTTPAuthorizationCredentials = Depends(auth_scheme)):

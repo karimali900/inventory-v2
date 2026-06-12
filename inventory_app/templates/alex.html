@@ -45,6 +45,32 @@
             #recipients-list { display: none !important; }
             .bg-amber-900\/40 { background: #fef3c7 !important; border-color: #d97706 !important; color: #92400e !important; }
         }
+        .status-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(15,23,42,0.95); border-top: 1px solid #334155; backdrop-filter: blur(12px); z-index: 100; padding: 6px 16px; font-size: 11px; display: flex; align-items: center; gap: 16px; overflow-x: auto; }
+        .status-bar .user-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: rgba(30,41,59,0.8); border: 1px solid #475569; white-space: nowrap; }
+        .status-bar .user-badge .net-local { color: #34d399; }
+        .status-bar .user-badge .net-remote { color: #fbbf24; }
+        .btn-click { transition: all 0.15s ease; cursor: pointer; }
+        .btn-click:active { transform: scale(0.95); }
+        .btn-click:hover { filter: brightness(1.15); }
+        .tab-btn { transition: all 0.2s ease; position: relative; }
+        .tab-btn::after { content: ''; position: absolute; bottom: -2px; left: 50%; width: 0; height: 2px; background: #fbbf24; transition: all 0.2s ease; transform: translateX(-50%); }
+        .tab-btn:hover::after { width: 60%; }
+        .tab-btn-active::after { width: 80% !important; }
+        .glass { transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+        .glass:hover { border-color: #475569; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #f59e0b !important; box-shadow: 0 0 0 2px rgba(245,158,11,0.2); transition: all 0.2s ease; }
+        button:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+        .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
+        .toast { padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #fff; backdrop-filter: blur(8px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); animation: toastIn 0.3s ease; transition: opacity 0.3s ease, transform 0.3s ease; }
+        .toast-hide { opacity: 0; transform: translateX(100px); }
+        .toast-success { background: rgba(5,150,105,0.9); border: 1px solid #34d399; }
+        .toast-error { background: rgba(220,38,38,0.9); border: 1px solid #f87171; }
+        .toast-info { background: rgba(37,99,235,0.9); border: 1px solid #60a5fa; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+        #scroll-top-btn { position: fixed; bottom: 60px; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: rgba(245,158,11,0.9); color: #fff; font-size: 20px; border: none; cursor: pointer; z-index: 99; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: all 0.2s ease; }
+        #scroll-top-btn:hover { background: #f59e0b; transform: translateY(-2px); }
+        .skeleton { background: linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(71,85,105,0.5) 50%, rgba(51,65,85,0.5) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen" style="padding-top: 4vh;">
@@ -92,12 +118,17 @@
             <div id="items-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </div>
 
-        <div id="tab-history-content" class="hidden">
-            <div class="glass rounded-xl p-4 border border-slate-600">
-                <div class="flex justify-between items-start mb-3">
-                    <h3 class="text-sm font-bold text-amber-400" data-i18n="globalHistory">Global Transaction History</h3>
-                    <button onclick="loadHistory(0)" id="history-refresh" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs font-bold transition">🔄 <span data-i18n="refresh">Refresh</span></button>
-                </div>
+         <div id="tab-history-content" class="hidden">
+             <div class="glass rounded-xl p-4 border border-slate-600">
+                 <div class="flex justify-between items-start mb-3">
+                     <h3 class="text-sm font-bold text-amber-400" data-i18n="globalHistory">Global Transaction History</h3>
+                     <div class="flex gap-2 items-center">
+                         <select id="history-station-filter" onchange="loadHistory(0)" class="bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-amber-500">
+                             <option value="" data-i18n="allStations">All Stations</option>
+                         </select>
+                         <button onclick="loadHistory(0)" id="history-refresh" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded text-xs font-bold transition">🔄 <span data-i18n="refresh">Refresh</span></button>
+                     </div>
+                 </div>
                 <div id="dist-stats" class="grid grid-cols-3 gap-2 mb-3"></div>
                 <div id="history-list" class="space-y-1 max-h-[60vh] overflow-y-auto scrollbar-hide"></div>
                 <div id="history-pagination" class="flex justify-between items-center mt-3 text-xs text-slate-400"></div>
@@ -175,12 +206,12 @@
 
             <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
                 <h3 class="text-sm font-bold text-emerald-400 mb-3" data-i18n="acceptedOrders">✅ Accepted Orders</h3>
-                <div id="accepted-orders-list" class="text-xs text-slate-400">Loading...</div>
+                <div id="accepted-orders-list" class="text-xs text-slate-400"><div class="skeleton h-3 w-3/4 my-1"></div><div class="skeleton h-3 w-1/2 my-1"></div></div>
             </div>
 
             <div class="glass rounded-xl p-4 border border-slate-600">
                 <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="pendingOrders">⏳ Pending & Refused Orders</h3>
-                <div id="pending-orders-list" class="text-xs text-slate-400">Loading...</div>
+                <div id="pending-orders-list" class="text-xs text-slate-400"><div class="skeleton h-3 w-2/3 my-1"></div><div class="skeleton h-3 w-1/2 my-1"></div></div>
             </div>
         </div>
 
@@ -357,7 +388,16 @@
             </div>
         </div>
 
-        <div style="text-align:center; padding:8px 0; margin-top:12px; font-size:12px; color:#d97706; font-weight:bold;">created by @KARIM</div>
+        <div style="text-align:left; padding:8px 0; margin-top:12px; font-size:12px; color:#d97706; font-weight:bold;">Created by @Karim</div>
+
+        <div id="status-bar" class="status-bar" style="display:none;">
+            <span class="text-slate-400 font-bold whitespace-nowrap" data-i18n="onlineUsers">👤 Online:</span>
+            <span id="status-users" class="text-slate-300 whitespace-nowrap">—</span>
+            <span id="last-updated" class="text-slate-600 ml-auto whitespace-nowrap"></span>
+        </div>
+
+        <div id="toast-container" class="toast-container"></div>
+        <button id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
     <div id="create-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div class="glass rounded-xl p-6 w-full max-w-md border border-slate-600">
@@ -500,6 +540,16 @@
 
     <script>
         const LANG_KEY = 'inventory_alex_lang';
+        const _origAlert = window.alert;
+        window.alert = function(msg) {
+            const c = document.getElementById('toast-container');
+            if (!c) { _origAlert(msg); return; }
+            const t = document.createElement('div');
+            t.className = 'toast toast-' + (msg.includes('Error') || msg.includes('خطأ') ? 'error' : 'info');
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.add('toast-hide'); setTimeout(() => t.remove(), 300); }, 3500);
+        };
         let currentLang = localStorage.getItem(LANG_KEY) || 'ar';
         const ROLE = localStorage.getItem('role') || 'viewer';
         function hasRole(...roles) { return roles.includes(ROLE); }
@@ -550,7 +600,7 @@
                 reqQty: 'أدخل كمية موجبة صحيحة',
                 reqThreshold: 'أدخل حداً صحيحاً',
                 error: 'خطأ',
-                beginningInventory: 'المخزون الافتتاحي',
+                beginningInventory: 'الرصيد الافتتاحى',
                 distribute: 'توزيع',
                 distHistory: 'التوزيعات',
                 distributeTitle: 'توزيع على محطة',
@@ -563,7 +613,7 @@
                 reqTransportCompany: 'اسم الشركة الناقلة مطلوب',
                 reqDriverName: 'اسم السائق مطلوب',
                 reqTruckNumber: 'رقم السيارة مطلوب',
-                distTo: 'توزيع إلى',
+                distTo: 'توزيع ل محطة',
                 noDist: 'لا توجد توزيعات بعد',
                 delete: '🗑️ حذف',
                 pending: 'تحت التنفيذ',
@@ -691,6 +741,7 @@
                 viewer: 'مشاهد',
                 deleteUserConfirm: 'حذف هذا المستخدم؟',
                 reqUserFields: 'اسم المستخدم وكلمة المرور مطلوبان',
+                onlineUsers: '👤 المتصلين:',
             },
             en: {
                 pageTitle: 'Alexandria Cement Movement | Inventory Balance Movement',
@@ -878,6 +929,7 @@
                 viewer: 'Viewer',
                 deleteUserConfirm: 'Delete this user?',
                 reqUserFields: 'Username and password required',
+                onlineUsers: '👤 Online:',
             }
         };
 
@@ -1181,7 +1233,8 @@
             const list = document.getElementById('history-list');
             const pag = document.getElementById('history-pagination');
             const statsEl = document.getElementById('dist-stats');
-            list.innerHTML = '<div class="text-xs text-slate-500 text-center py-4">Loading...</div>';
+            const stationSel = document.getElementById('history-station-filter');
+            list.innerHTML = '<div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-4 w-1/2 mb-2"></div><div class="skeleton h-4 w-2/3 mb-2"></div><div class="skeleton h-4 w-1/3"></div>';
 
             try {
                 const sr = await fetch('/api/inventory/distributions/stats');
@@ -1191,8 +1244,28 @@
                     '<div class="bg-slate-900/50 rounded p-2 text-center"><span class="text-xs text-slate-400 block">' + t('stations') + '</span><span class="text-lg font-bold text-purple-400">' + s.unique_stations + '</span></div>';
             } catch {}
 
+            // Populate station dropdown
+            if (stationSel) {
+                const currentStation = stationSel.value;
+                try {
+                    const sr = await fetch('/api/inventory/stations/search?q=');
+                    const sd = await sr.json();
+                    stationSel.innerHTML = '<option value="">' + t('allStations') + '</option>';
+                    (sd || []).forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.station;
+                        opt.textContent = s.station;
+                        if (s.station === currentStation) opt.selected = true;
+                        stationSel.appendChild(opt);
+                    });
+                } catch { /* keep default */ }
+            }
+
             try {
-                const res = await fetch(`/api/inventory/history?limit=${HISTORY_LIMIT}&offset=${offset}`);
+                const station = stationSel ? stationSel.value : '';
+                let url = `/api/inventory/history?limit=${HISTORY_LIMIT}&offset=${offset}`;
+                if (station) url += '&station=' + encodeURIComponent(station);
+                const res = await fetch(url);
                 const data = await res.json();
                 const txs = data.transactions;
                 if (!txs.length) {
@@ -1203,9 +1276,14 @@
                         const cls = isDist ? 'text-rose-400' : 'text-emerald-400';
                         const sign = isDist ? '−' : '+';
                         const distNum = isDist && tx.dist_num ? tx.dist_num + '.' : '';
+                        let note = tx.note || '';
+                        if (isDist && note) {
+                            if (note.startsWith('Distribution to ')) note = note.slice(16);
+                            note = t('distTo') + ' ' + note;
+                        }
                         return `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-800 last:border-0">
                             <div><span class="text-slate-600 font-mono">${distNum}</span><span class="text-slate-500">${new Date(tx.created_at).toLocaleDateString()}</span> <span class="${cls} font-bold">${tx.item_name}</span></div>
-                            <div><span class="${cls}">${sign}${tx.quantity}</span> <span class="text-slate-500">${tx.note || ''}</span></div>
+                            <div><span class="${cls}">${sign}${tx.quantity}</span> <span class="text-slate-500">${note}</span></div>
                         </div>`;
                     }).join('');
                 }
@@ -1858,6 +1936,10 @@
                     const sign = tx.type === 'addition' ? '+' : '−';
                     let noteLabel = tx.note;
                     if (tx.type === 'addition' && tx.note === 'Beginning inventory') noteLabel = t('beginningInventory');
+                    if (isDist && noteLabel) {
+                        if (noteLabel.startsWith('Distribution to ')) noteLabel = noteLabel.slice(16);
+                        noteLabel = t('distTo') + ' ' + noteLabel;
+                    }
                     const distNum = isDist && tx.dist_num ? tx.dist_num + '.' : '';
                     return `<div class="flex justify-between items-center text-xs py-1.5 border-b border-slate-800 last:border-0">
                         <div>
@@ -2091,8 +2173,101 @@
             currentLang = currentLang === 'ar' ? 'en' : 'ar';
             localStorage.setItem(LANG_KEY, currentLang);
             applyTranslation();
-            fetchItems();
         }
+
+        // ─── Toast System ────────────────────────────────────────
+        function toast(msg, type) {
+            const c = document.getElementById('toast-container');
+            if (!c) return;
+            const t = document.createElement('div');
+            t.className = 'toast toast-' + (type || 'info');
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => {
+                t.classList.add('toast-hide');
+                setTimeout(() => t.remove(), 300);
+            }, 3500);
+        }
+
+        // ─── Keyboard Shortcuts ──────────────────────────────────
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay').forEach(m => {
+                    m.classList.add('hidden');
+                    m.classList.remove('flex');
+                });
+            }
+        });
+
+        // ─── Scroll-to-Top ───────────────────────────────────────
+        window.addEventListener('scroll', () => {
+            const btn = document.getElementById('scroll-top-btn');
+            if (btn) btn.style.display = window.scrollY > 300 ? 'flex' : 'none';
+        });
+
+        // ─── Animated Counter ────────────────────────────────────
+        function animateValue(el, start, end, duration, prefix, suffix) {
+            if (!el) return;
+            prefix = prefix || ''; suffix = suffix || '';
+            const range = end - start;
+            const startTime = performance.now();
+            function step(now) {
+                const p = Math.min((now - startTime) / duration, 1);
+                const v = start + range * p;
+                el.textContent = prefix + (Number.isInteger(v) ? v : v.toFixed(1)) + suffix;
+                if (p < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // ─── Update Timestamp ────────────────────────────────────
+        function updateTimestamp() {
+            const el = document.getElementById('last-updated');
+            if (el) el.textContent = '🕐 ' + new Date().toLocaleTimeString();
+        }
+
+        // ─── Click Sound ─────────────────────────────────────────
+        let audioCtx = null;
+        function playClick() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.frequency.value = 800; osc.type = 'sine';
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.06);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.06);
+            } catch {}
+        }
+        document.addEventListener('click', e => {
+            if (e.target.closest('button, a, input, select, textarea, .btn-click')) playClick();
+        });
+
+        // ─── Active Users ────────────────────────────────────────
+        async function loadActiveUsers() {
+            try {
+                const res = await fetch('/api/active-users');
+                const data = await res.json();
+                const bar = document.getElementById('status-bar');
+                const el = document.getElementById('status-users');
+                if (!bar || !el) return;
+                if (data.users && data.users.length) {
+                    bar.style.display = 'flex';
+                    el.innerHTML = data.users.map(u => {
+                        const netCls = u.network === 'داخلى' ? 'net-local' : 'net-remote';
+                        return `<span class="user-badge"><span class="text-amber-400">${esc(u.username)}</span> <span class="text-slate-500">${esc(u.ip)}</span> <span class="${netCls}">● ${esc(u.network)}</span></span>`;
+                    }).join('');
+                } else {
+                    bar.style.display = 'none';
+                    el.innerHTML = '—';
+                }
+                updateTimestamp();
+            } catch { /* silent */ }
+        }
+
+        applyTranslation();
+        fetchItems();
 
         function logout() {
             localStorage.removeItem('token');
@@ -2307,6 +2482,8 @@
                 });
             }
         }).catch(() => {});
+        loadActiveUsers();
+        setInterval(loadActiveUsers, 10000);
     </script>
 </body>
 </html>
