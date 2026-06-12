@@ -1388,7 +1388,7 @@ async def control_room(request: Request):
 async def dashboard_summary():
     async def fetch_branch_items(branch):
         try:
-            db_path = Path(__file__).parent / f"{branch}.db"
+            db_path = Path(branch + ".db")
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM items WHERE archived=0 ORDER BY name").fetchall()
