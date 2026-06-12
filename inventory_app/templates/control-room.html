@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Room — Inventory Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { background: #020617; color: #e2e8f0; font-family: monospace; margin: 0; overflow: hidden; }
+        .alert-card { transition: all 0.3s ease; }
+        .alert-critical { background: rgba(220,38,38,0.15); border: 2px solid #ef4444; box-shadow: 0 0 24px rgba(239,68,68,0.2); }
+        .alert-warning { background: rgba(234,179,8,0.1); border: 2px solid #eab308; box-shadow: 0 0 16px rgba(234,179,8,0.15); }
+        .stat-box { background: rgba(15,23,42,0.8); border: 1px solid #334155; border-radius: 8px; padding: 12px 20px; }
+        .pulse { animation: pulse-alert 1.5s ease-in-out infinite; }
+        @keyframes pulse-alert { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .pulse-border { animation: pulse-border 2s ease-in-out infinite; }
+        @keyframes pulse-border { 0%,100% { border-color: #ef4444; } 50% { border-color: rgba(239,68,68,0.3); } }
+        #clock { font-size: clamp(2rem, 6vw, 4rem); font-weight: bold; color: #fbbf24; letter-spacing: 0.1em; }
+        .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+        .toast { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; background: rgba(220,38,38,0.9); border: 1px solid #f87171; color: #fff; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+        ::-webkit-scrollbar { width: 0; }
+        @media (max-width: 768px) {
+            body { overflow: auto; }
+            #clock { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+    <div class="flex justify-between items-start mb-6 flex-wrap gap-4">
+        <div>
+            <div class="text-amber-400 text-sm font-bold uppercase tracking-widest">🚀 Control Room</div>
+            <div id="clock" class="mt-1"></div>
+        </div>
+        <div class="flex items-center gap-4 text-xs text-slate-500">
+            <span id="last-updated-monitor"></span>
+            <span class="flex items-center gap-1"><span id="status-dot" class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> <span id="status-text">Live</span></span>
+            <a href="/" class="text-sky-400 hover:text-sky-300 transition">← Back to App</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" id="stats-row">
+        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase">Total Stock</div><div class="text-2xl font-bold text-amber-400" id="stat-total">0</div></div>
+        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase">Items</div><div class="text-2xl font-bold text-white" id="stat-items">0</div></div>
+        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase">Alerts</div><div class="text-2xl font-bold" id="stat-alerts">0</div></div>
+        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase">Online</div><div class="text-2xl font-bold text-emerald-400" id="stat-users">0</div></div>
+    </div>
+
+    <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+        <div class="flex flex-col gap-3 overflow-y-auto" id="alerts-column">
+            <div class="text-sm font-bold text-rose-400 uppercase tracking-wider">🚨 Alerts</div>
+            <div id="alerts-list" class="flex flex-col gap-2"></div>
+        </div>
+        <div class="flex flex-col gap-3 overflow-y-auto">
+            <div class="text-sm font-bold text-sky-400 uppercase tracking-wider">📊 Overview</div>
+            <div id="overview-list" class="flex flex-col gap-2"></div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        let prevAlerts = [];
+        let prevStats = { total: 0, items: 0, alerts: 0, users: 0 };
+        let audioCtx = null;
+
+        function playDunDun() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioCtx.currentTime;
+                [440, 330].forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.type = 'sine'; osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.4, now + i * 0.25);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.25 + 0.4);
+                    osc.start(now + i * 0.25);
+                    osc.stop(now + i * 0.25 + 0.4);
+                });
+            } catch {}
+        }
+
+        function playChime() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioCtx.currentTime;
+                [523, 659, 784].forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.type = 'sine'; osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.3, now + i * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.3);
+                    osc.start(now + i * 0.12);
+                    osc.stop(now + i * 0.12 + 0.3);
+                });
+            } catch {}
+        }
+
+        function updateClock() {
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+        }
+
+        function showToast(msg) {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(100px)'; t.style.transition = 'all 0.3s'; setTimeout(() => t.remove(), 300); }, 5000);
+        }
+
+        function esc(s) { return String(s).replace(/[&<>"]/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+
+        async function fetchDashboard() {
+            try {
+                const res = await fetch('/api/dashboard-summary');
+                const data = await res.json();
+                renderDashboard(data);
+            } catch {}
+        }
+
+        function renderDashboard(data) {
+            const allAlerts = [...(data.bani?.alerts || []).map(i => ({...i, branch: 'bani'})), ...(data.alex?.alerts || []).map(i => ({...i, branch: 'alex'}))];
+            const totalStock = (data.bani?.total_stock || 0) + (data.alex?.total_stock || 0);
+            const totalItems = (data.bani?.items?.length || 0) + (data.alex?.items?.length || 0);
+            const users = data.active_users?.length || 0;
+
+            document.getElementById('stat-total').textContent = totalStock.toFixed(1);
+            document.getElementById('stat-items').textContent = totalItems;
+            document.getElementById('stat-alerts').textContent = allAlerts.length;
+            document.getElementById('stat-alerts').className = 'text-2xl font-bold ' + (allAlerts.length > 0 ? 'text-rose-400 pulse' : 'text-emerald-400');
+            document.getElementById('stat-users').textContent = users;
+
+            // Alerts column
+            const alertsEl = document.getElementById('alerts-list');
+            if (!allAlerts.length) {
+                alertsEl.innerHTML = '<div class="text-slate-500 text-center py-8 text-sm">✅ All stock levels normal</div>';
+            } else {
+                alertsEl.innerHTML = allAlerts.map(i => {
+                    const isOut = i.current_stock <= 0;
+                    return '<div class="alert-card rounded-xl p-4 ' + (isOut ? 'alert-critical pulse-border' : 'alert-warning') + '">' +
+                        '<div class="flex justify-between items-center">' +
+                        '<div><span class="font-bold text-lg">' + esc(i.name) + '</span>' +
+                        '<span class="text-xs text-slate-500 ml-2 uppercase">[' + esc(i.branch) + ']</span></div>' +
+                        '<span class="text-2xl font-bold ' + (isOut ? 'text-rose-400' : 'text-yellow-400') + '">' + Number(i.current_stock).toFixed(1) + '</span>' +
+                        '</div>' +
+                        '<div class="text-xs text-slate-400 mt-1">Threshold: ' + i.warning_threshold + ' — ' + (isOut ? 'OUT OF STOCK' : 'LOW') + '</div>' +
+                        '</div>';
+                }).join('');
+            }
+
+            // Overview
+            const ovEl = document.getElementById('overview-list');
+            const baniLow = data.bani?.alerts?.length || 0;
+            const alexLow = data.alex?.alerts?.length || 0;
+            ovEl.innerHTML = `
+                <div class="stat-box"><div class="text-xs text-slate-400">بنى سويف</div><div class="text-lg font-bold text-amber-400">Items: ${data.bani?.items?.length || 0} / Alerts: ${baniLow}</div></div>
+                <div class="stat-box"><div class="text-xs text-slate-400">الإسكندرية</div><div class="text-lg font-bold text-amber-400">Items: ${data.alex?.items?.length || 0} / Alerts: ${alexLow}</div></div>
+                <div class="stat-box"><div class="text-xs text-slate-400">Users Online</div><div class="text-lg font-bold text-emerald-400">${(data.active_users || []).map(u => esc(u.username)).join(', ') || 'None'}</div></div>
+            `;
+
+            // Detect changes
+            const alertKeys = allAlerts.map(i => i.id + '-' + i.branch + '-' + i.current_stock).sort().join(',');
+            const prevKeys = prevAlerts.map(i => i.id + '-' + i.branch + '-' + i.current_stock).sort().join(',');
+            if (prevAlerts.length && alertKeys !== prevKeys) {
+                if (allAlerts.length > prevAlerts.length) {
+                    playDunDun();
+                    const newAlerts = allAlerts.filter(a => !prevAlerts.find(p => p.id === a.id && p.branch === a.branch));
+                    newAlerts.forEach(a => showToast('🚨 ' + a.name + ' — LOW STOCK (' + Number(a.current_stock).toFixed(1) + ' ' + a.branch + ')'));
+                }
+            }
+            prevAlerts = allAlerts;
+            document.getElementById('last-updated-monitor').textContent = '🕐 ' + new Date().toLocaleTimeString();
+        }
+
+        function startMonitor() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            fetchDashboard();
+            setInterval(fetchDashboard, 10000);
+            playChime();
+        }
+
+        // Full-screen support
+        document.addEventListener('keydown', e => {
+            if (e.key === 'f' || e.key === 'F') {
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+                else document.exitFullscreen?.();
+            }
+        });
+
+        startMonitor();
+    </script>
+</body>
+</html>

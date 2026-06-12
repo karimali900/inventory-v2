@@ -1380,6 +1380,32 @@ async def delete_user(user_id: int, auth: HTTPAuthorizationCredentials = Depends
 async def login_page(request: Request, next: str = "/branches/"):
     return templates.TemplateResponse(request, "login.html", {"next": next})
 
+@app.get("/control-room", response_class=HTMLResponse)
+async def control_room(request: Request):
+    return templates.TemplateResponse(request, "control-room.html", {})
+
+@app.get("/api/dashboard-summary")
+async def dashboard_summary():
+    async def fetch_branch_items(branch):
+        try:
+            db_path = Path(__file__).parent / f"{branch}.db"
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT * FROM inventory_items WHERE archived=0 ORDER BY name").fetchall()
+            low = [dict(r) for r in rows if r["current_stock"] <= r["warning_threshold"]]
+            total = sum(r["current_stock"] for r in rows)
+            conn.close()
+            return {"branch": branch, "items": [dict(r) for r in rows], "alerts": low, "total_stock": total}
+        except:
+            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0}
+    bani_data = await fetch_branch_items("bani")
+    alex_data = await fetch_branch_items("alex")
+    return {
+        "bani": bani_data,
+        "alex": alex_data,
+        "active_users": list(active_sessions.values()),
+    }
+
 @app.get("/branches", response_class=HTMLResponse)
 @app.get("/branches/", response_class=HTMLResponse)
 async def branch_select(request: Request):
