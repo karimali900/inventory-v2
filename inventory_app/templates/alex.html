@@ -198,7 +198,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
                     <input id="order-customer" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderCustomer" placeholder="Customer Name">
                     <input id="order-phone" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" placeholder="Phone">
-                    <input id="order-item" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderItem" placeholder="Item">
+                    <input id="order-item" list="item-suggestions" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderItem" placeholder="Item">
                     <input id="order-qty" type="number" step="0.01" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm" data-i18n-placeholder="orderQty" placeholder="Quantity (ton)">
                     <button onclick="createOrder()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="addOrder">➕ Add Order</button>
                 </div>
@@ -283,6 +283,7 @@
         </div>
 
         <datalist id="global-suggest"></datalist>
+        <datalist id="item-suggestions"></datalist>
 
         <!-- Add User Modal -->
         <div id="add-user-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
@@ -405,7 +406,7 @@
             <div class="space-y-3">
                 <div>
                     <label class="text-xs text-slate-400 block mb-1" data-i18n="itemName">اسم الصنف</label>
-                    <input id="create-name" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" data-i18n-placeholder="itemNamePlaceholder">
+                    <input id="create-name" list="item-suggestions" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" data-i18n-placeholder="itemNamePlaceholder">
                 </div>
                 <div>
                     <label class="text-xs text-slate-400 block mb-1" data-i18n="description">الوصف</label>
@@ -1392,7 +1393,7 @@
                         '</td><td class="py-2 px-2 text-right">';
                     if (c.phone) {
                         html += '<a href="tel:' + c.phone + '" class="text-sky-400 hover:text-sky-300 mr-2" title="' + t('callContact') + '">' + t('callContact') + '</a>';
-                        if (hasWA) html += '<a href="https://wa.me/' + c.phone.replace(/^0+/, '20') + '" target="_blank" class="text-emerald-400 hover:text-emerald-300 mr-2" title="' + t('whatsappContact') + '">' + t('whatsappContact') + '</a>';
+                        if (hasWA) html += '<a href="' + waUrl(c.phone, 'مرحباً ' + c.name) + '" target="_blank" class="text-emerald-400 hover:text-emerald-300 mr-2" title="' + t('whatsappContact') + '">' + t('whatsappContact') + '</a>';
                     } else {
                         html += '<span class="text-yellow-400 text-xs">' + t('pendingContact') + '</span>';
                     }
@@ -1450,7 +1451,7 @@
                         '<span class="font-bold text-amber-400 min-w-[120px]">' + esc(o.customer_name) + '</span>' +
                         '<span class="text-slate-300">' + esc(o.item_name) + '</span>' +
                         '<span class="text-slate-400">' + Number(o.quantity).toFixed(2) + ' ' + o.unit + '</span>' +
-                        (o.phone ? '<span class="text-slate-500">' + esc(o.phone) + '</span>' : '') +
+                        (o.phone ? '<span class="text-slate-500">' + esc(o.phone) + '</span> <a href="' + waUrl(o.phone, 'مرحباً ' + o.customer_name + '، بخصوص طلب ' + o.item_name + ' بكمية ' + Number(o.quantity).toFixed(2) + ' طن') + '" target="_blank" class="text-emerald-400 hover:text-emerald-300" title="واتساب">💬</a>' : '') +
                         '<span class="text-xs text-yellow-400 ml-auto">' + new Date(o.created_at).toLocaleString() + '</span>' +
                         '<button onclick="acceptOrder(' + o.id + ')" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold transition">' + t('accept') + '</button>' +
                         '<button onclick="showRefuseDialog(' + o.id + ')" class="bg-rose-700 hover:bg-rose-600 text-white px-3 py-1 rounded text-xs font-bold transition">' + t('refuse') + '</button>' +
@@ -1483,12 +1484,14 @@
                     '<th class="py-2 px-2">' + t('orderCustomer') + '</th>' +
                     '<th class="py-2 px-2">' + t('orderItem') + '</th>' +
                     '<th class="py-2 px-2 text-right">' + t('orderQty') + '</th>' +
+                    '<th class="py-2 px-2"></th>' +
                     '</tr></thead><tbody>';
                 items.forEach(a => {
                     html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
                         '<td class="py-2 px-2 font-bold text-emerald-400">' + esc(a.customer_name) + '</td>' +
                         '<td class="py-2 px-2">' + esc(a.item_name) + '</td>' +
                         '<td class="py-2 px-2 text-right font-bold">' + Number(a.total_qty).toFixed(2) + ' ' + a.unit + '</td>' +
+                        '<td class="py-2 px-2 text-right">' + (a.phone ? '<a href="' + waUrl(a.phone, 'مرحباً ' + a.customer_name + '، بخصوص طلب ' + a.item_name + ' بكمية ' + Number(a.total_qty).toFixed(2) + ' طن') + '" target="_blank" class="text-emerald-400 hover:text-emerald-300" title="واتساب">💬</a>' : '') + '</td>' +
                         '</tr>';
                 });
                 html += '</tbody></table>' +
@@ -1552,6 +1555,11 @@
         }
 
         function esc(s) { return String(s).replace(/[&<>"]/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+        function waUrl(phone, text) {
+            if (!phone) return '#';
+            const p = phone.replace(/^0+/, '20').replace(/[^\d]/g, '');
+            return text ? 'https://wa.me/' + p + '?text=' + encodeURIComponent(text) : 'https://wa.me/' + p;
+        }
 
         function togglePassword(fieldId, btn) {
             const f = document.getElementById(fieldId);
@@ -1777,6 +1785,7 @@
             const res = await fetch('/api/inventory/items');
             items = await res.json();
             populateItemSelect();
+            populateItemSuggestions();
             renderItems();
             renderAlerts();
         }
@@ -1793,6 +1802,13 @@
                 if (String(i.id) === current) opt.selected = true;
                 sel.appendChild(opt);
             });
+        }
+
+        function populateItemSuggestions() {
+            const dl = document.getElementById('item-suggestions');
+            if (!dl) return;
+            const names = [...new Set(items.map(i => i.name))];
+            dl.innerHTML = names.map(n => '<option value="' + esc(n) + '">').join('');
         }
 
         function itemSelectChanged(id) {

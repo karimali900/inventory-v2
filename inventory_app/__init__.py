@@ -594,8 +594,8 @@ class InventoryBranch:
         conn = self.db()
         cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
         rows = conn.execute(
-            "SELECT * FROM customer_orders WHERE created_at >= ? ORDER BY created_at DESC",
-            (cutoff,)
+            "SELECT customer_name, item_name, SUM(quantity) as total_qty, unit, COUNT(*) as order_count, (SELECT phone FROM customer_orders WHERE customer_name=co.customer_name AND status='accepted' AND created_at >= ? ORDER BY id DESC LIMIT 1) as phone FROM customer_orders co WHERE status='accepted' AND created_at >= ? GROUP BY customer_name, item_name ORDER BY customer_name",
+            (cutoff, cutoff)
         ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
@@ -621,8 +621,8 @@ class InventoryBranch:
         conn = self.db()
         cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
         rows = conn.execute(
-            "SELECT customer_name, item_name, SUM(quantity) as total_qty, unit, COUNT(*) as order_count FROM customer_orders WHERE status='accepted' AND created_at >= ? GROUP BY customer_name, item_name ORDER BY customer_name",
-            (cutoff,)
+            "SELECT customer_name, item_name, SUM(quantity) as total_qty, unit, COUNT(*) as order_count, (SELECT phone FROM customer_orders WHERE customer_name=co.customer_name AND status='accepted' AND created_at >= ? ORDER BY id DESC LIMIT 1) as phone FROM customer_orders co WHERE status='accepted' AND created_at >= ? GROUP BY customer_name, item_name ORDER BY customer_name",
+            (cutoff, cutoff)
         ).fetchall()
         total = conn.execute(
             "SELECT COALESCE(SUM(quantity),0) as s FROM customer_orders WHERE status='accepted' AND created_at >= ?",
