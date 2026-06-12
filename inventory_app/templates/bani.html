@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="pageTitle">Inventory Balance Movement</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -72,6 +76,24 @@
         .skeleton { background: linear-gradient(90deg, rgba(51,65,85,0.5) 25%, rgba(71,85,105,0.5) 50%, rgba(51,65,85,0.5) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .num-animate { transition: color 0.5s ease; }
+        /* Mobile optimizations */
+        * { -webkit-tap-highlight-color: transparent; }
+        html { overscroll-behavior: none; }
+        input, select, textarea { font-size: 16px !important; }
+        .touch-manipulation { touch-action: manipulation; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        @media (max-width: 768px) {
+            .mobile-stack { flex-direction: column !important; align-items: stretch !important; }
+            .mobile-full { width: 100% !important; }
+            .mobile-text-sm { font-size: 12px !important; }
+            .mobile-gap { gap: 6px !important; }
+            table { font-size: 11px !important; }
+            table th, table td { padding: 4px 6px !important; }
+            .status-bar { font-size: 10px !important; gap: 8px !important; padding: 4px 8px !important; }
+            #scroll-top-btn { bottom: 48px; right: 8px; width: 34px; height: 34px; font-size: 16px; }
+        }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen" style="padding-top: 4vh;">
@@ -240,6 +262,35 @@
             <div class="glass rounded-xl p-4 border border-slate-600">
                 <h3 class="text-sm font-bold text-amber-400 mb-3" data-i18n="contactsList">📋 Contacts List</h3>
                 <div id="contacts-list" class="text-xs text-slate-400">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Edit Contact Modal -->
+        <div id="edit-contact-modal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center p-4">
+            <div class="glass rounded-xl p-6 w-full max-w-sm border border-slate-600">
+                <h2 class="text-lg font-bold text-sky-400 mb-4" data-i18n="editContact">✏️ Edit Contact</h2>
+                <input id="edit-contact-id" type="hidden">
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="contactName">Name</label>
+                        <input id="edit-contact-name" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="contactPhone">Phone</label>
+                        <input id="edit-contact-phone" type="tel" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-xs text-slate-400"><input id="edit-contact-whatsapp" type="checkbox" class="rounded border-slate-600"> <span data-i18n="hasWhatsapp">WhatsApp</span></label>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 block mb-1" data-i18n="contactNotes">Notes</label>
+                        <input id="edit-contact-notes" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button onclick="closeEditContact()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm font-bold transition" data-i18n="cancel">Cancel</button>
+                        <button onclick="saveEditContact()" class="flex-1 bg-sky-700 hover:bg-sky-600 text-white py-2 rounded text-sm font-bold transition" data-i18n="save">💾 Save</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -758,6 +809,8 @@
                 todayAdditions: 'Today Adds',
                 todayDistributions: 'Today Dists',
                 onlineUsers: '👤 Online:',
+                editContact: '✏️ Edit Contact',
+                updated: '✅ Updated',
             },
             ar: {
                 pageTitle: 'حركة مخزون اسمنت بنى سويف | ميزان حركة المخزون',
@@ -952,6 +1005,8 @@
                 todayAdditions: 'الوارد اليوم',
                 todayDistributions: 'المنصرف اليوم',
                 onlineUsers: '👤 المتصلين:',
+                editContact: '✏️ تعديل',
+                updated: '✅ تم التحديث',
             }
         };
 
@@ -1422,12 +1477,51 @@
                     } else {
                         html += '<span class="text-yellow-400 text-xs">' + t('pendingContact') + '</span>';
                     }
+                    html += '<button onclick="editContact(' + c.id + ')" class="text-sky-400 hover:text-sky-300 text-xs ml-2">✏️</button>';
                     html += '<button onclick="deleteContact(' + c.id + ')" class="text-red-400 hover:text-red-300 text-xs ml-2">' + t('deleteContact') + '</button>';
                     html += '</td></tr>';
                 });
                 html += '</tbody></table>';
                 el.innerHTML = html;
             } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading contacts</p>'; }
+        }
+
+        function editContact(id) {
+            fetch('/api/inventory/contacts/' + id).then(r => r.json()).then(c => {
+                document.getElementById('edit-contact-id').value = c.id;
+                document.getElementById('edit-contact-name').value = c.name || '';
+                document.getElementById('edit-contact-phone').value = c.phone || '';
+                document.getElementById('edit-contact-whatsapp').checked = !!c.has_whatsapp;
+                document.getElementById('edit-contact-notes').value = c.notes || '';
+                document.getElementById('edit-contact-modal').classList.remove('hidden');
+                document.getElementById('edit-contact-modal').classList.add('flex');
+            }).catch(() => alert(t('error')));
+        }
+
+        function closeEditContact() {
+            document.getElementById('edit-contact-modal').classList.add('hidden');
+            document.getElementById('edit-contact-modal').classList.remove('flex');
+        }
+
+        async function saveEditContact() {
+            const id = document.getElementById('edit-contact-id').value;
+            const name = document.getElementById('edit-contact-name').value.trim();
+            const phone = document.getElementById('edit-contact-phone').value.trim();
+            const has_whatsapp = document.getElementById('edit-contact-whatsapp').checked;
+            const notes = document.getElementById('edit-contact-notes').value.trim();
+            if (!name) { alert(t('error')); return; }
+            try {
+                const res = await fetch('/api/inventory/contacts/' + id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, phone, has_whatsapp, notes, status: phone ? 'available' : 'pending'})
+                });
+                if (res.ok) {
+                    closeEditContact();
+                    loadContacts();
+                    toast(t('updated'));
+                } else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
+            } catch { alert(t('error')); }
         }
 
         async function addContact() {
@@ -2532,6 +2626,9 @@
         }).catch(() => {});
         loadActiveUsers();
         setInterval(loadActiveUsers, 10000);
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+        }
     </script>
 </body>
 </html>

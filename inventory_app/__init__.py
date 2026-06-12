@@ -292,6 +292,7 @@ class InventoryBranch:
         self.router.add_api_route("/api/inventory/cement-news", self.get_cement_news, methods=["GET"])
         self.router.add_api_route("/api/inventory/contacts", self.list_contacts, methods=["GET"])
         self.router.add_api_route("/api/inventory/contacts", self.create_contact, methods=["POST"])
+        self.router.add_api_route("/api/inventory/contacts/{contact_id}", self.get_contact, methods=["GET"])
         self.router.add_api_route("/api/inventory/contacts/{contact_id}", self.update_contact, methods=["PUT"])
         self.router.add_api_route("/api/inventory/contacts/{contact_id}", self.delete_contact, methods=["DELETE"])
         self.router.add_api_route("/api/inventory/ostool-operations", self.get_ostool_operations, methods=["GET"])
@@ -898,6 +899,14 @@ class InventoryBranch:
         rows = conn.execute("SELECT * FROM customer_contacts ORDER BY name").fetchall()
         conn.close()
         return [dict(r) for r in rows]
+
+    async def get_contact(self, contact_id: int):
+        conn = self.db()
+        row = conn.execute("SELECT * FROM customer_contacts WHERE id=?", (contact_id,)).fetchone()
+        conn.close()
+        if not row:
+            raise HTTPException(404, "Contact not found")
+        return dict(row)
 
     async def create_contact(self, body: dict):
         name = body.get("name", "").strip()
