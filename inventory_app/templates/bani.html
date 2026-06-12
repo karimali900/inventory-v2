@@ -501,9 +501,12 @@
         <div id="chat-panel" class="glass">
             <div class="chat-header">
                 <span class="text-xs font-bold text-sky-400" data-i18n="chat">💬 Chat</span>
+                <div class="flex items-center gap-2">
                 <div class="chat-tabs">
                     <button class="chat-tab active" onclick="switchChatTab('users',this)" data-i18n="chatUsers">Users</button>
                     <button class="chat-tab" onclick="switchChatTab('messages',this)" data-i18n="messages">Messages</button>
+                </div>
+                <button onclick="toggleChat()" class="text-slate-400 hover:text-white text-xs" style="background:none;border:none;cursor:pointer;padding:2px 6px;">✕</button>
                 </div>
             </div>
             <div id="chat-users" class="chat-body"></div>
@@ -893,6 +896,7 @@
                 messages: 'Messages',
                 send: 'Send',
                 noUsers: 'No other users online',
+                selectUserFirst: 'Click a user name first to start chatting',
                 noMessages: 'No messages yet',
                 chatPlaceholder: 'Type a message...',
                 callIncoming: 'Incoming call from',
@@ -2604,7 +2608,7 @@
         let chatConnected = false;
         let chatUnread = 0;
         let currentChatUser = null;
-        let chatBranch = window.location.pathname.split('/')[1] || 'bani';
+        let chatBranch = 'global';
         let pc = null;
         let localStream = null;
         let remoteStream = null;
@@ -2682,17 +2686,16 @@
             const me = localStorage.getItem('username') || 'admin';
             const others = users.filter(u => u.username !== me);
             if (!others.length) {
-                el.innerHTML = '<div class="text-slate-500 text-center py-8 text-xs">' + t('noUsers') + '</div>';
+                el.innerHTML = '<div class="text-slate-500 text-center py-4 text-xs">' + t('noUsers') + '</div>' +
+                    '<div class="chat-user" style="opacity:0.5"><span class="name"><span class="dot online"></span>' + esc(me) + ' (' + t('you') + ')</span></div>';
                 return;
             }
             el.innerHTML = others.map(u => {
-                const hasMic = checkMedia('audio');
-                const hasCam = checkMedia('video');
                 return '<div class="chat-user">' +
-                    '<span class="name"><span class="dot online"></span>' + esc(u.username) + '</span>' +
+                    '<span class="name" style="cursor:pointer" onclick="selectChatUser(\'' + esc(u.username) + '\')"><span class="dot online"></span>' + esc(u.username) + '</span>' +
                     '<div>' +
-                    (hasMic ? '<button class="call-btn" onclick="startCall(\'' + u.username + '\',false)" title="Audio">📞</button>' : '<button class="call-btn" onclick="startCall(\'' + u.username + '\',false)" title="Audio only">📞</button>') +
-                    (hasCam ? '<button class="call-btn video" onclick="startCall(\'' + u.username + '\',true)" title="Video">📹</button>' : '') +
+                    '<button class="call-btn" onclick="startCall(\'' + u.username + '\',false)" title="Audio">📞</button>' +
+                    '<button class="call-btn video" onclick="startCall(\'' + u.username + '\',true)" title="Video">📹</button>' +
                     '</div></div>';
             }).join('');
         }
@@ -2710,12 +2713,22 @@
             el.scrollTop = el.scrollHeight;
         }
 
+        function selectChatUser(username) {
+            currentChatUser = username;
+            document.querySelector('.chat-header span').textContent = '💬 → ' + username;
+            document.querySelectorAll('.chat-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.chat-tabs button:last-child').classList.add('active');
+            document.getElementById('chat-users').style.display = 'none';
+            document.getElementById('chat-messages').style.display = 'block';
+            document.getElementById('chat-input').focus();
+        }
+
         function sendChat() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if (!text || !chatWs || chatWs.readyState !== WebSocket.OPEN) return;
             const target = currentChatUser;
-            if (!target) { toast(t('error')); return; }
+            if (!target) { toast(t('selectUserFirst')); return; }
             sendWsMsg({type: 'chat', to: target, text});
             appendChatMessage(localStorage.getItem('username') || 'me', text, null, true);
             input.value = '';
