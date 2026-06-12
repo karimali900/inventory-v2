@@ -9,56 +9,74 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
-        body { background: #020617; color: #e2e8f0; font-family: monospace; margin: 0; overflow: hidden; }
+        body { background: #020617; color: #e2e8f0; font-family: monospace; margin: 0; }
         .alert-card { transition: all 0.3s ease; }
         .alert-critical { background: rgba(220,38,38,0.15); border: 2px solid #ef4444; box-shadow: 0 0 24px rgba(239,68,68,0.2); }
         .alert-warning { background: rgba(234,179,8,0.1); border: 2px solid #eab308; box-shadow: 0 0 16px rgba(234,179,8,0.15); }
-        .stat-box { background: rgba(15,23,42,0.8); border: 1px solid #334155; border-radius: 8px; padding: 12px 20px; }
+        .stat-box { background: rgba(15,23,42,0.8); border: 1px solid #334155; border-radius: 12px; padding: 20px 24px; }
         .pulse { animation: pulse-alert 1.5s ease-in-out infinite; }
         @keyframes pulse-alert { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
         .pulse-border { animation: pulse-border 2s ease-in-out infinite; }
         @keyframes pulse-border { 0%,100% { border-color: #ef4444; } 50% { border-color: rgba(239,68,68,0.3); } }
-        #clock { font-size: clamp(2rem, 6vw, 4rem); font-weight: bold; color: #fbbf24; letter-spacing: 0.1em; }
+        #clock { font-size: clamp(2.5rem, 7vw, 5rem); font-weight: bold; color: #fbbf24; letter-spacing: 0.08em; text-align: center; }
         .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
-        .toast { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; background: rgba(220,38,38,0.9); border: 1px solid #f87171; color: #fff; animation: slideIn 0.3s ease; }
+        .toast { padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; background: rgba(220,38,38,0.9); border: 1px solid #f87171; color: #fff; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
         ::-webkit-scrollbar { width: 0; }
         .rtl { direction: rtl; }
+        .dash-layout { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; gap: 20px; }
+        .stat-label { font-size: 0.9rem; letter-spacing: 0.05em; }
+        .stat-value { font-size: clamp(1.8rem, 4vw, 3rem); font-weight: bold; }
+        .section-title { font-size: 1rem; letter-spacing: 0.1em; }
+        .alert-name { font-size: clamp(1rem, 2vw, 1.4rem); }
+        .alert-stock { font-size: clamp(1.5rem, 3vw, 2.2rem); }
+        .alert-detail { font-size: 0.85rem; }
+        .overview-label { font-size: 0.85rem; }
+        .overview-value { font-size: clamp(1.1rem, 2.5vw, 1.6rem); }
+        .top-bar { width: 100%; max-width: 1400px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .stats-grid { width: 100%; max-width: 1400px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .panels-grid { width: 100%; max-width: 1400px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-height: 0; }
         @media (max-width: 768px) {
             body { overflow: auto; }
             #clock { font-size: 2rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .panels-grid { grid-template-columns: 1fr; }
+            .stat-box { padding: 12px 16px; }
+            .dash-layout { padding: 12px; gap: 12px; }
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col p-4 md:p-8">
-    <div class="flex justify-between items-start mb-6 flex-wrap gap-4">
-        <div>
-            <div class="text-amber-400 text-sm font-bold uppercase tracking-widest" id="dash-title">🚀 Control Room</div>
-            <div id="clock" class="mt-1"></div>
+<body>
+    <div class="dash-layout">
+        <div class="top-bar">
+            <div>
+                <div class="text-amber-400 font-bold uppercase tracking-widest section-title" id="dash-title">🚀 Control Room</div>
+                <div id="clock" class="mt-2"></div>
+            </div>
+            <div class="flex items-center gap-4" style="font-size:0.85rem;color:#94a3b8;">
+                <span id="last-updated-monitor"></span>
+                <span class="flex items-center gap-1"><span id="status-dot" class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span> <span id="status-text">Live</span></span>
+                <button onclick="toggleLangMon()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded font-bold transition" id="lang-btn-mon" style="font-size:0.85rem;">عربي</button>
+                <a href="/" class="text-sky-400 hover:text-sky-300 transition" id="back-link">← Back</a>
+            </div>
         </div>
-        <div class="flex items-center gap-4 text-xs text-slate-500">
-            <span id="last-updated-monitor"></span>
-            <span class="flex items-center gap-1"><span id="status-dot" class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span> <span id="status-text">Live</span></span>
-            <button onclick="toggleLangMon()" class="bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded text-xs font-bold transition" id="lang-btn-mon">عربي</button>
-            <a href="/" class="text-sky-400 hover:text-sky-300 transition" id="back-link">← Back to App</a>
-        </div>
-    </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" id="stats-row">
-        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase" id="label-total">Net Stock (ton)</div><div class="text-2xl font-bold text-amber-400" id="stat-total">0</div></div>
-        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase" id="label-items">Items</div><div class="text-2xl font-bold text-white" id="stat-items">0</div></div>
-        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase" id="label-alerts">Alerts</div><div class="text-2xl font-bold" id="stat-alerts">0</div></div>
-        <div class="stat-box text-center"><div class="text-xs text-slate-400 uppercase" id="label-online">Online</div><div class="text-2xl font-bold text-emerald-400" id="stat-users">0</div></div>
-    </div>
-
-    <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
-        <div class="flex flex-col gap-3 overflow-y-auto" id="alerts-column">
-            <div class="text-sm font-bold text-rose-400 uppercase tracking-wider" id="alerts-heading">🚨 Alerts</div>
-            <div id="alerts-list" class="flex flex-col gap-2"></div>
+        <div class="stats-grid">
+            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-total">Net Stock (ton)</div><div class="stat-value text-amber-400" id="stat-total">0</div></div>
+            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-items">Items</div><div class="stat-value text-white" id="stat-items">0</div></div>
+            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-alerts">Alerts</div><div class="stat-value" id="stat-alerts">0</div></div>
+            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-online">Online</div><div class="stat-value text-emerald-400" id="stat-users">0</div></div>
         </div>
-        <div class="flex flex-col gap-3 overflow-y-auto">
-            <div class="text-sm font-bold text-sky-400 uppercase tracking-wider" id="overview-heading">📊 Overview</div>
-            <div id="overview-list" class="flex flex-col gap-2"></div>
+
+        <div class="panels-grid">
+            <div class="flex flex-col gap-3 overflow-y-auto">
+                <div class="section-title font-bold text-rose-400 uppercase tracking-wider" id="alerts-heading">🚨 Alerts</div>
+                <div id="alerts-list" class="flex flex-col gap-3"></div>
+            </div>
+            <div class="flex flex-col gap-3 overflow-y-auto">
+                <div class="section-title font-bold text-sky-400 uppercase tracking-wider" id="overview-heading">📊 Overview</div>
+                <div id="overview-list" class="flex flex-col gap-3"></div>
+            </div>
         </div>
     </div>
 
@@ -75,7 +93,7 @@
                 title: '🚀 Control Room',
                 clock: '🕐',
                 live: 'Live',
-                back: '← Back to App',
+                back: '← Back',
                 langBtn: 'عربي',
                 netStock: 'Net Stock (ton)',
                 items: 'Items',
@@ -95,7 +113,7 @@
                 title: '🚀 غرفة التحكم',
                 clock: '🕐',
                 live: 'مباشر',
-                back: '← الرجوع للتطبيق',
+                back: '← رجوع',
                 langBtn: 'English',
                 netStock: 'صافى المخزون (طن)',
                 items: 'الأصناف',
@@ -197,29 +215,29 @@
 
         function renderDashboard(data) {
             const allAlerts = [...(data.bani?.alerts || []).map(i => ({...i, branch: 'bani'})), ...(data.alex?.alerts || []).map(i => ({...i, branch: 'alex'}))];
-            const totalStock = (data.bani?.total_stock || 0) + (data.alex?.total_stock || 0);
+            const totalStock = (parseFloat(data.bani?.total_stock) || 0) + (parseFloat(data.alex?.total_stock) || 0);
             const totalItems = (data.bani?.items?.length || 0) + (data.alex?.items?.length || 0);
             const users = data.active_users?.length || 0;
 
-            document.getElementById('stat-total').textContent = Number(totalStock).toFixed(1);
+            document.getElementById('stat-total').textContent = totalStock.toFixed(1);
             document.getElementById('stat-items').textContent = totalItems;
             document.getElementById('stat-alerts').textContent = allAlerts.length;
-            document.getElementById('stat-alerts').className = 'text-2xl font-bold ' + (allAlerts.length > 0 ? 'text-rose-400 pulse' : 'text-emerald-400');
+            document.getElementById('stat-alerts').className = 'stat-value ' + (allAlerts.length > 0 ? 'text-rose-400 pulse' : 'text-emerald-400');
             document.getElementById('stat-users').textContent = users;
 
             const alertsEl = document.getElementById('alerts-list');
             if (!allAlerts.length) {
-                alertsEl.innerHTML = '<div class="text-slate-500 text-center py-8 text-sm">' + t('allNormal') + '</div>';
+                alertsEl.innerHTML = '<div class="text-slate-500 text-center py-8" style="font-size:1.1rem;">' + t('allNormal') + '</div>';
             } else {
                 alertsEl.innerHTML = allAlerts.map(i => {
                     const isOut = i.current_stock <= 0;
-                    return '<div class="alert-card rounded-xl p-4 ' + (isOut ? 'alert-critical pulse-border' : 'alert-warning') + '">' +
+                    return '<div class="alert-card rounded-xl p-5 ' + (isOut ? 'alert-critical pulse-border' : 'alert-warning') + '">' +
                         '<div class="flex justify-between items-center">' +
-                        '<div><span class="font-bold text-lg">' + esc(i.name) + '</span>' +
-                        '<span class="text-xs text-slate-500 ml-2 uppercase">[' + esc(i.branch) + ']</span></div>' +
-                        '<span class="text-2xl font-bold ' + (isOut ? 'text-rose-400' : 'text-yellow-400') + '">' + Number(i.current_stock).toFixed(1) + '</span>' +
+                        '<div><span class="alert-name font-bold">' + esc(i.name) + '</span>' +
+                        '<span class="text-slate-500 ml-2" style="font-size:0.85rem;">[' + esc(i.branch) + ']</span></div>' +
+                        '<span class="alert-stock font-bold ' + (isOut ? 'text-rose-400' : 'text-yellow-400') + '">' + Number(i.current_stock).toFixed(1) + '</span>' +
                         '</div>' +
-                        '<div class="text-xs text-slate-400 mt-1">' + t('threshold') + ': ' + i.warning_threshold + ' — ' + (isOut ? t('outOfStock') : t('low')) + '</div>' +
+                        '<div class="alert-detail text-slate-400 mt-2">' + t('threshold') + ': ' + i.warning_threshold + ' — ' + (isOut ? t('outOfStock') : t('low')) + '</div>' +
                         '</div>';
                 }).join('');
             }
@@ -228,9 +246,9 @@
             const baniLow = data.bani?.alerts?.length || 0;
             const alexLow = data.alex?.alerts?.length || 0;
             ovEl.innerHTML = `
-                <div class="stat-box"><div class="text-xs text-slate-400">بنى سويف</div><div class="text-lg font-bold text-amber-400">${t('items')}: ${data.bani?.items?.length || 0} / ${t('alerts')}: ${baniLow}</div></div>
-                <div class="stat-box"><div class="text-xs text-slate-400">الإسكندرية</div><div class="text-lg font-bold text-amber-400">${t('items')}: ${data.alex?.items?.length || 0} / ${t('alerts')}: ${alexLow}</div></div>
-                <div class="stat-box"><div class="text-xs text-slate-400">${t('usersOnline')}</div><div class="text-lg font-bold text-emerald-400">${(data.active_users || []).map(u => esc(u.username)).join(', ') || t('none')}</div></div>
+                <div class="stat-box"><div class="overview-label text-slate-400">بنى سويف</div><div class="overview-value font-bold text-amber-400">${t('items')}: ${data.bani?.items?.length || 0} / ${t('alerts')}: ${baniLow}</div></div>
+                <div class="stat-box"><div class="overview-label text-slate-400">الإسكندرية</div><div class="overview-value font-bold text-amber-400">${t('items')}: ${data.alex?.items?.length || 0} / ${t('alerts')}: ${alexLow}</div></div>
+                <div class="stat-box"><div class="overview-label text-slate-400">${t('usersOnline')}</div><div class="overview-value font-bold text-emerald-400">${(data.active_users || []).map(u => esc(u.username)).join(', ') || t('none')}</div></div>
             `;
 
             const alertKeys = allAlerts.map(i => i.id + '-' + i.branch + '-' + i.current_stock).sort().join(',');
