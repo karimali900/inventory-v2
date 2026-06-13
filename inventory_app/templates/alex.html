@@ -2693,7 +2693,7 @@
             try {
                 const form = new FormData();
                 form.append('file', file);
-                const res = await fetch('/api/upload', {method: 'POST', body: form});
+                const res = await _fetch('/api/upload', {method: 'POST', body: form});
                 const data = await res.json();
                 if (data.url) {
                     sendWsMsg({type: 'chat', to: target, text: data.url});
