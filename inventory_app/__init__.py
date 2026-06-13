@@ -1138,6 +1138,7 @@ class InventoryBranch:
         station_filter = body.get("station", "").strip()
         general_note = body.get("general_note", "").strip()
         date = body.get("date", "").strip()
+        transport_info = body.get("transport_info", "")
         conn = self.db()
         where = self._ostool_where()
         params = []
@@ -1197,7 +1198,9 @@ class InventoryBranch:
         </div>"""
         general_note_html = f"""<div style="padding:8px 16px;background:#fefce8;border-bottom:1px solid #fde68a;font-size:12px;color:#92400e">
           <strong>ملاحظات:</strong> {general_note}</div>""" if general_note else ""
-        html += f"""{general_note_html}
+        transport_html = f"""<div style="padding:8px 16px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:12px;color:#166534">
+          <strong>🚚 النقل مشمول:</strong> {transport_info}</div>""" if transport_info else ""
+        html += f"""{general_note_html}{transport_html}
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#92400e;color:white">
         <th style="padding:8px;text-align:left">الشركة الناقلة</th>
@@ -1281,9 +1284,13 @@ alex = InventoryBranch("alex", "alex.db", "alex.html", 8003)
 # ─── Main app ─────────────────────────────────────────────────────
 app = FastAPI(title="Inventory Management V2")
 STATIC_DIR = Path(__file__).parent / "static"
+UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
 os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 from fastapi.staticfiles import StaticFiles
+from fastapi import UploadFile, File
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -1470,6 +1477,16 @@ async def dashboard_summary():
         "alex": alex_data,
         "active_users": list(active_sessions.values()),
     }
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    import uuid
+    ext = Path(file.filename).suffix if file.filename else ""
+    name = uuid.uuid4().hex + ext
+    path = UPLOAD_DIR / name
+    content = await file.read()
+    path.write_bytes(content)
+    return {"url": f"/uploads/{name}", "name": file.filename or name}
 
 @app.get("/branches", response_class=HTMLResponse)
 @app.get("/branches/", response_class=HTMLResponse)
