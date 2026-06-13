@@ -239,16 +239,13 @@
         </div>
 
         <div id="tab-vehicles-content" class="hidden">
-            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
-                <div class="flex flex-wrap gap-2 mb-3 items-center">
-                    <input id="vehicle-name" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[140px]" placeholder="Vehicle Name">
-                    <input id="vehicle-plate" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[100px]" placeholder="Plate #">
-                    <button onclick="addVehicle()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition">➕ Add Vehicle</button>
-                    <a href="https://altair.ostool-eg.com/" target="_blank" rel="noopener noreferrer" class="bg-sky-700 hover:bg-sky-600 text-white px-4 py-2 rounded text-sm font-bold transition">🛰️ GPS</a>
-                </div>
-            </div>
             <div class="glass rounded-xl p-4 border border-slate-600">
-                <div id="vehicles-list" class="text-xs text-slate-400"><div class="skeleton h-3 w-3/4 my-1"></div></div>
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="text-lg">🚛</span>
+                    <h3 class="text-lg font-bold text-amber-400" data-i18n="fleetStatus">Fleet Status</h3>
+                </div>
+                <p class="text-slate-400 text-sm mb-4" data-i18n="fleetDesc">Enter vehicle counts for each category at the start of the work day.</p>
+                <div id="fleet-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
             </div>
         </div>
 
@@ -275,6 +272,20 @@
                     </table>
                 </div>
                 <p id="accounts-empty" class="text-slate-500 text-center py-8 text-sm" style="display:none;" data-i18n="accountsNoData">No completed distributions for this date.</p>
+            </div>
+            <div class="glass rounded-xl p-4 border border-slate-600 mt-4">
+                <h3 class="text-sm font-bold text-emerald-400 mb-3" data-i18n="depositsTitle">💰 Deposits & Swifts</h3>
+                <div class="flex flex-wrap gap-2 mb-3 items-center">
+                    <input id="deposit-station" list="deposit-station-list" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[120px]" placeholder="Station" data-i18n-placeholder="depositStationPlaceholder">
+                    <datalist id="deposit-station-list"></datalist>
+                    <input id="deposit-amount" type="number" step="0.01" min="0" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm w-[100px]" placeholder="Amount" data-i18n-placeholder="depositAmountPlaceholder">
+                    <select id="deposit-method" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm">
+                        <option value="Deposit" data-i18n="depositOption">💰 Deposit</option>
+                        <option value="Swift" data-i18n="swiftOption">💱 Swift</option>
+                    </select>
+                    <button onclick="addDeposit()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="addDeposit">➕ Add</button>
+                </div>
+                <div id="deposits-list" class="text-xs text-slate-400"><div class="skeleton h-3 w-3/4 my-1"></div></div>
             </div>
         </div>
 
@@ -359,10 +370,10 @@
 
         <div id="tab-ostool-content" class="hidden">
             <div class="flex flex-wrap gap-2 mb-4 items-center">
-                <select id="ostool-station-filter" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm">
+                <select id="ostool-station-filter" onchange="loadOstoolOps();loadOstoolAttachments()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm">
                     <option value="" data-i18n="allStations">All Stations</option>
                 </select>
-                <input id="ostool-date" type="date" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                <input id="ostool-date" type="date" onchange="loadOstoolOps();loadOstoolAttachments()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
                 <input id="ostool-emails" list="ostool-email-list" autocomplete="email" placeholder="dtitan@ostool-eg.com" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-emerald-500" onchange="localStorage.setItem('ostool_emails', this.value)">
                 <datalist id="ostool-email-list"></datalist>
                 <button onclick="sendOstoolEmail()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="ostoolEmail">📧 Email to Ostool</button>
@@ -372,6 +383,12 @@
                 <textarea id="ostool-general-note" rows="2" placeholder="ملاحظات عامة للإيميل..." class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-rose-500 resize-none text-xs" oninput="localStorage.setItem('ostool_general_note', this.value)"></textarea>
                 <button onclick="document.getElementById('ostool-general-note').value='';localStorage.removeItem('ostool_general_note')" class="bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded text-xs font-bold transition self-end" data-i18n="delete">🗑️ Delete</button>
             </div>
+            <div class="flex flex-wrap gap-2 mb-4 items-center">
+                <input id="ostool-attachment" type="file" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm text-xs file:bg-amber-600 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:mr-2 file:cursor-pointer file:hover:bg-amber-500">
+                <button onclick="uploadOstoolAttachment()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="uploadFile">📎 Upload</button>
+                <button onclick="checkOstoolEmail()" class="bg-sky-700 hover:bg-sky-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="checkEmail">📩 Check Email</button>
+            </div>
+            <div id="ostool-attachments-list" class="flex flex-wrap gap-2 mb-4 text-xs"></div>
             <div class="glass rounded-xl p-4 border border-slate-600">
                 <div id="ostool-content" class="text-xs text-slate-400">Loading...</div>
             </div>
@@ -813,18 +830,16 @@
                 reportSent: 'Report sent successfully!',
                 reportFailed: 'Failed to send report:',
                 gps: '🛰️ GPS Tracker',
-                vehicles: '🚛 Vehicles',
-                vehicleName: 'Vehicle Name',
-                vehiclePlate: 'Plate #',
-                vehicleLocation: 'Location',
-                vehicleUpdated: 'Updated',
-                addVehicle: '➕ Add Vehicle',
-                insideFactory: 'Inside the factory',
-                outsideFactory: 'Outside the factory',
-                onWayThere: 'On the way there',
-                onWayBack: 'On the way back',
-                atLocation: 'At the location',
-                noVehicles: 'No vehicles added yet.',
+                vehicles: '🚛 Fleet Status',
+                fleetStatus: 'Fleet Status',
+                fleetDesc: 'Enter vehicle counts for each category at the start of the work day.',
+                fleetRegistered: 'Registered vehicles',
+                fleetInside: 'Inside the factory',
+                fleetOutside: 'Outside the factory',
+                fleetGoing: 'On the road — Going',
+                fleetReturning: 'On the road — Returning',
+                fleetMaintenance: 'Maintenance / Breakdown',
+                fleetUpdated: 'Last updated',
                 accounts: '💰 Station Accounts',
                 accountsStation: 'Station',
                 accountsItem: 'Item',
@@ -834,6 +849,16 @@
                 accountsTotalWeight: 'Total Weight',
                 accountsTotalRevenue: 'Total Revenue',
                 accountsTransport: 'Transport',
+                depositsTitle: '💰 Deposits & Swifts',
+                noDeposits: 'No deposits yet.',
+                operations: 'operations',
+                amount: 'Amount',
+                method: 'Method',
+                depositStationPlaceholder: 'Station',
+                depositAmountPlaceholder: 'Amount',
+                addDeposit: '➕ Add',
+                depositOption: '💰 Deposit',
+                swiftOption: '💱 Swift',
                 accountsNoData: 'No completed distributions for this date.',
                 accLoad: 'Load',
                 accRefresh: '🔄 Refresh',
@@ -892,6 +917,14 @@
                 noOstool: 'No Ostool operations found.',
                 ostoolEmailSent: 'Ostool report sent via email',
                 allStations: 'All Stations',
+                uploadFile: '📎 Upload',
+                checkEmail: '📩 Check Email',
+                checking: 'Checking',
+                emailsFound: 'New emails found',
+                from: 'From',
+                attachments: 'Attachments',
+                noNewEmails: 'No new emails found',
+                uploadedOk: 'File uploaded successfully',
                 searchFiles: '📁 Internal Search',
                 searchMaps: '🗺️ Google Maps',
                 searchApp: '🔎 Search App',
@@ -1039,18 +1072,16 @@
                 reportSent: 'تم إرسال التقرير بنجاح!',
                 reportFailed: 'فشل إرسال التقرير:',
                 gps: '🛰️ تتبع سيارات اسطول',
-                vehicles: '🚛 سيارات الاسطول',
-                vehicleName: 'اسم السيارة',
-                vehiclePlate: 'رقم اللوحة',
-                vehicleLocation: 'الموقع',
-                vehicleUpdated: 'آخر تحديث',
-                addVehicle: '➕ إضافة سيارة',
-                insideFactory: 'داخل المصنع',
-                outsideFactory: 'خارج المصنع',
-                onWayThere: 'في الطريق هناك',
-                onWayBack: 'في طريق العودة',
-                atLocation: 'في الموقع',
-                noVehicles: 'لا توجد سيارات مضافة بعد.',
+                vehicles: '🚛 حالة الاسطول',
+                fleetStatus: 'حالة الاسطول',
+                fleetDesc: 'أدخل أعداد المركبات لكل فئة في بداية يوم العمل.',
+                fleetRegistered: 'المركبات المسجلة',
+                fleetInside: 'داخل المصنع',
+                fleetOutside: 'خارج المصنع',
+                fleetGoing: 'في الطريق — ذهاب',
+                fleetReturning: 'في الطريق — عودة',
+                fleetMaintenance: 'صيانة / أعطال',
+                fleetUpdated: 'آخر تحديث',
                 accounts: '💰 حسابات المحطات',
                 accountsStation: 'المحطة',
                 accountsItem: 'الصنف',
@@ -1060,6 +1091,16 @@
                 accountsTotalWeight: 'الوزن الإجمالي',
                 accountsTotalRevenue: 'المبلغ الإجمالي',
                 accountsTransport: 'النقل',
+                depositsTitle: '💰 إيداعات وتحويلات',
+                noDeposits: 'لا توجد إيداعات بعد.',
+                operations: 'عملية',
+                amount: 'المبلغ',
+                method: 'الطريقة',
+                depositStationPlaceholder: 'المحطة',
+                depositAmountPlaceholder: 'المبلغ',
+                addDeposit: '➕ إضافة',
+                depositOption: '💰 إيداع',
+                swiftOption: '💱 تحويل',
                 accountsNoData: 'لا توجد توزيعات مكتملة لهذا التاريخ.',
                 accLoad: 'تحميل',
                 accRefresh: '🔄 تحديث',
@@ -1119,6 +1160,14 @@
                 ostoolEmailSent: 'تم إرسال تقرير الاسطول عبر الإيميل',
                 allStations: 'جميع المحطات',
                 sending: 'جارٍ الإرسال',
+                uploadFile: '📎 رفع ملف',
+                checkEmail: '📩 فحص البريد',
+                checking: 'جارٍ الفحص',
+                emailsFound: 'رسائل جديدة وُجدت',
+                from: 'من',
+                attachments: 'المرفقات',
+                noNewEmails: 'لا توجد رسائل جديدة',
+                uploadedOk: 'تم رفع الملف بنجاح',
                 searchFiles: '📁 بحث داخلي',
                 searchMaps: '🗺️ خرائط جوجل',
                 searchApp: '🔎 بحث في النظام',
@@ -1265,7 +1314,7 @@
             } else if (tab === 'vehicles') {
                 veh.classList.remove('hidden');
                 btnVeh.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
-                loadVehicles();
+                loadFleetStatus();
             } else if (tab === 'orders') {
                 ord.classList.remove('hidden');
                 btnOrd.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
@@ -1285,10 +1334,12 @@
                 const d = document.getElementById('accounts-date');
                 if (!d.value) d.value = new Date().toISOString().slice(0,10);
                 loadStationAccounts();
+                loadDeposits();
             } else if (tab === 'ostool') {
                 ost.classList.remove('hidden');
                 btnOst.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
                 loadOstoolOps();
+                loadOstoolAttachments();
             } else if (tab === 'users') {
                 usr.classList.remove('hidden');
                 btnUsr.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
@@ -1717,75 +1768,51 @@
             } catch { alert(t('error')); }
         }
 
-        // ─── Vehicles ───
-        async function loadVehicles() {
-            const el = document.getElementById('vehicles-list');
+        // ─── Fleet Status ───
+        const FLEET_CATEGORIES = [
+            { key: 'fleetRegistered', cat: 'Registered vehicles', icon: '📋' },
+            { key: 'fleetInside', cat: 'Inside the factory', icon: '🏭' },
+            { key: 'fleetOutside', cat: 'Outside the factory', icon: '🌍' },
+            { key: 'fleetGoing', cat: 'On the road - Going', icon: '🚚➡️' },
+            { key: 'fleetReturning', cat: 'On the road - Returning', icon: '🚚⬅️' },
+            { key: 'fleetMaintenance', cat: 'Maintenance / Breakdown', icon: '🔧' },
+        ];
+
+        async function loadFleetStatus() {
+            const el = document.getElementById('fleet-list');
+            if (!el) return;
             try {
-                const res = await fetch('/api/inventory/vehicles');
+                const res = await fetch('/api/inventory/fleet-status');
                 const data = await res.json();
-                if (!data.length) {
-                    el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noVehicles') + '</p>';
-                    return;
-                }
-                const locs = ['Inside the factory','Outside the factory','On the way there','On the way back','At the location'];
-                let html = '<table class="w-full text-left"><thead><tr class="text-slate-400 border-b border-slate-700">' +
-                    '<th class="py-2 px-2">' + t('vehicleName') + '</th>' +
-                    '<th class="py-2 px-2">' + t('vehiclePlate') + '</th>' +
-                    '<th class="py-2 px-2">' + t('vehicleLocation') + '</th>' +
-                    '<th class="py-2 px-2">' + t('vehicleUpdated') + '</th>' +
-                    '<th class="py-2 px-2"></th></tr></thead><tbody>';
-                data.forEach(v => {
-                    html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
-                        '<td class="py-2 px-2 font-bold text-amber-400">' + esc(v.name) + '</td>' +
-                        '<td class="py-2 px-2 text-slate-300">' + esc(v.plate_number || '—') + '</td>' +
-                        '<td class="py-2 px-2"><select onchange="updateVehicleLocation(' + v.id + ',this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs">';
-                    locs.forEach(l => {
-                        html += '<option value="' + l + '"' + (v.current_location === l ? ' selected' : '') + '>' + t(l === 'Inside the factory' ? 'insideFactory' : l === 'Outside the factory' ? 'outsideFactory' : l === 'On the way there' ? 'onWayThere' : l === 'On the way back' ? 'onWayBack' : 'atLocation') + '</option>';
-                    });
-                    html += '</select></td>' +
-                        '<td class="py-2 px-2 text-slate-500 text-[10px]">' + (v.updated_at ? new Date(v.updated_at + 'Z').toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US') : '—') + '</td>' +
-                        '<td class="py-2 px-2 text-right"><button onclick="deleteVehicle(' + v.id + ')" class="text-red-400 hover:text-red-300 text-xs">' + t('delete') + '</button></td>' +
-                        '</tr>';
-                });
-                html += '</tbody></table>';
-                el.innerHTML = html;
-            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading vehicles</p>'; }
+                const map = {};
+                data.forEach(r => { map[r.category] = r; });
+                el.innerHTML = FLEET_CATEGORIES.map(c => {
+                    const r = map[c.cat] || { count: 0, updated_at: '' };
+                    return '<div class="glass rounded-xl p-4 border border-slate-600">' +
+                        '<div class="flex items-center gap-2 mb-2">' +
+                        '<span class="text-xl">' + c.icon + '</span>' +
+                        '<span class="font-bold text-amber-400 text-sm">' + t(c.key) + '</span></div>' +
+                        '<div class="flex items-center gap-2 mt-2">' +
+                        '<input type="number" id="fleet-input-' + esc(c.cat) + '" value="' + r.count + '" min="0" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-lg font-bold w-24 text-center">' +
+                        '<button onclick="updateFleetCount(\'' + esc(c.cat) + '\')" class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded text-xs font-bold transition">' + t('save') + '</button></div>' +
+                        (r.updated_at ? '<div class="text-[10px] text-slate-500 mt-1">' + t('fleetUpdated') + ': ' + new Date(r.updated_at + 'Z').toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US') + '</div>' : '') +
+                        '</div>';
+                }).join('');
+            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error loading fleet status</p>'; }
         }
 
-        async function updateVehicleLocation(id, location) {
+        async function updateFleetCount(category) {
+            const input = document.getElementById('fleet-input-' + category);
+            if (!input) return;
+            const count = parseInt(input.value) || 0;
             try {
-                const res = await fetch('/api/inventory/vehicles/' + id + '/location', {
+                const res = await fetch('/api/inventory/fleet-status', {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({current_location: location})
+                    body: JSON.stringify({category, count})
                 });
-                if (res.ok) { loadVehicles(); toast(t('updated')); }
+                if (res.ok) { loadFleetStatus(); toast(t('updated')); }
                 else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
-            } catch { alert(t('error')); }
-        }
-
-        async function addVehicle() {
-            const name = document.getElementById('vehicle-name').value.trim();
-            const plate = document.getElementById('vehicle-plate').value.trim();
-            if (!name) { alert(t('error')); return; }
-            try {
-                const res = await fetch('/api/inventory/vehicles', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name, plate_number: plate})
-                });
-                if (res.ok) {
-                    document.getElementById('vehicle-name').value = '';
-                    document.getElementById('vehicle-plate').value = '';
-                    loadVehicles();
-                } else { const err = await res.json(); alert(t('error') + ': ' + (err.detail || '')); }
-            } catch { alert(t('error')); }
-        }
-
-        async function deleteVehicle(id) {
-            try {
-                await fetch('/api/inventory/vehicles/' + id, {method: 'DELETE'});
-                loadVehicles();
             } catch { alert(t('error')); }
         }
 
@@ -1914,6 +1941,84 @@
             `);
             printWindow.document.close();
             setTimeout(() => printWindow.print(), 500);
+        }
+
+        // ─── Ostool Attachments ───
+        async function loadOstoolAttachments() {
+            const date = document.getElementById('ostool-date')?.value || '';
+            const el = document.getElementById('ostool-attachments-list');
+            try {
+                const res = await fetch('/api/inventory/ostool-attachments?date=' + encodeURIComponent(date));
+                const data = await res.json();
+                if (!data.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+                el.style.display = 'flex';
+                el.innerHTML = data.map(a =>
+                    '<div class="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 flex items-center gap-2">' +
+                    '<span class="text-amber-400 text-xs">📎</span>' +
+                    '<a href="' + a.url + '" target="_blank" class="text-sky-400 hover:text-sky-300 text-xs underline truncate max-w-[180px]" title="' + esc(a.original_name) + '">' + esc(a.original_name) + '</a>' +
+                    '<span class="text-slate-600 text-[10px]">(' + (a.file_size ? (a.file_size / 1024).toFixed(1) + 'KB' : '') + ')</span>' +
+                    '<button onclick="deleteOstoolAttachment(' + a.id + ')" class="text-red-400 hover:text-red-300 text-xs ml-1">✕</button>' +
+                    '</div>'
+                ).join('');
+            } catch { el.style.display = 'none'; }
+        }
+
+        async function uploadOstoolAttachment() {
+            const input = document.getElementById('ostool-attachment');
+            const file = input.files?.[0];
+            if (!file) { toast(t('error')); return; }
+            const date = document.getElementById('ostool-date')?.value || '';
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('ostool_date', date);
+            try {
+                const res = await fetch('/api/inventory/ostool-attachments', { method: 'POST', body: fd });
+                if (res.ok) {
+                    input.value = '';
+                    loadOstoolAttachments();
+                    toast(t('uploadedOk'));
+                } else { toast(t('error')); }
+            } catch { toast(t('error')); }
+        }
+
+        async function deleteOstoolAttachment(id) {
+            try {
+                await fetch('/api/inventory/ostool-attachments/' + id, { method: 'DELETE' });
+                loadOstoolAttachments();
+            } catch { toast(t('error')); }
+        }
+
+        async function checkOstoolEmail() {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = t('checking') + '...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/check-email', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (data.ok && data.count > 0) {
+                    let msg = t('emailsFound') + ': ' + data.count + '\n';
+                    data.emails.forEach(e => {
+                        msg += '\n📧 ' + e.subject + '\n   ' + t('from') + ': ' + e.from;
+                        if (e.attachments.length) {
+                            msg += '\n   📎 ' + t('attachments') + ':';
+                            e.attachments.forEach(a => msg += '\n      - ' + a.original + ' (' + a.url + ')');
+                        }
+                    });
+                    alert(msg);
+                    if (data.emails.some(e => e.attachments.length)) loadOstoolAttachments();
+                } else if (data.ok) {
+                    alert(t('noNewEmails'));
+                } else {
+                    alert(t('error') + ': ' + (data.error || ''));
+                }
+            } catch { alert(t('error')); }
+            btn.textContent = orig;
+            btn.disabled = false;
         }
 
         async function loadOrders() {
@@ -2545,6 +2650,7 @@
                 return;
             }
             await fetchItems();
+            logActivity('create_item', name);
         }
 
         async function toggleDistribution(distId, checked) {
@@ -2692,6 +2798,15 @@
                 t.classList.add('toast-hide');
                 setTimeout(() => t.remove(), 300);
             }, 3500);
+        }
+
+        // ─── Activity Logging ─────────────────────────────────────
+        function logActivity(action, details) {
+            const username = localStorage.getItem('username') || 'unknown';
+            const branch = '{{ api_prefix }}'.replace('/', '');
+            try {
+                navigator.sendBeacon('/api/activity-log', JSON.stringify({username, branch, action, details}));
+            } catch {}
         }
 
         // ─── Keyboard Shortcuts ──────────────────────────────────
@@ -3178,6 +3293,7 @@
                 </tr>`;
                 window._stationData = stations;
                 calcRevenue();
+                populateDepositStations();
             } catch(e) {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-red-400 text-center py-4">' + t('error') + '</td></tr>';
             }
@@ -3203,6 +3319,98 @@
             });
             const gt = document.getElementById('grand-total');
             if (gt) gt.textContent = grand.toFixed(2);
+        }
+
+        // ─── Deposits & Swifts ───
+        async function loadDeposits() {
+            const el = document.getElementById('deposits-list');
+            try {
+                const res = await fetch('/api/inventory/deposits');
+                const data = await res.json();
+                if (!data.length) { el.innerHTML = '<p class="text-slate-500 text-center py-4">' + t('noDeposits') + '</p>'; return; }
+                // Aggregate by station
+                const agg = {};
+                data.forEach(d => {
+                    if (!agg[d.station_name]) agg[d.station_name] = { total: 0, deposits: 0, swifts: 0, count: 0 };
+                    agg[d.station_name].total += d.amount;
+                    agg[d.station_name].count++;
+                    if (d.method === 'Swift') agg[d.station_name].swifts += d.amount;
+                    else agg[d.station_name].deposits += d.amount;
+                });
+                const stationKeys = Object.keys(agg);
+                let html = '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">';
+                stationKeys.sort().forEach(s => {
+                    const a = agg[s];
+                    html += '<div class="bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700">' +
+                        '<div class="text-amber-400 font-bold text-xs">' + esc(s) + '</div>' +
+                        '<div class="text-white font-bold text-sm">' + a.total.toFixed(2) + '</div>' +
+                        '<div class="text-[10px] text-slate-500">' + a.count + ' ' + t('operations') + (a.swifts > 0 ? '  |  💱 ' + a.swifts.toFixed(2) : '') + '</div>' +
+                        '</div>';
+                });
+                html += '</div>';
+                html += '<table class="w-full text-left"><thead><tr class="text-slate-400 border-b border-slate-700">' +
+                    '<th class="py-2 px-2" data-i18n="accountsStation">Station</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="amount">Amount</th>' +
+                    '<th class="py-2 px-2 text-center" data-i18n="method">Method</th>' +
+                    '<th class="py-2 px-2 text-right" data-i18n="date">Date</th>' +
+                    '<th class="py-2 px-2"></th></tr></thead><tbody>';
+                data.forEach(d => {
+                    const methodLabel = d.method === 'Swift' ? '💱 Swift' : '💰 Deposit';
+                    const methodCls = d.method === 'Swift' ? 'text-sky-400' : 'text-emerald-400';
+                    html += '<tr class="border-b border-slate-700 hover:bg-slate-800/50">' +
+                        '<td class="py-2 px-2 font-bold text-amber-400">' + esc(d.station_name) + '</td>' +
+                        '<td class="py-2 px-2 text-right text-white font-bold">' + Number(d.amount).toFixed(2) + '</td>' +
+                        '<td class="py-2 px-2 text-center ' + methodCls + ' font-bold text-xs">' + methodLabel + '</td>' +
+                        '<td class="py-2 px-2 text-right text-slate-500 text-[10px]">' + (d.created_at ? d.created_at.slice(0, 10) : '—') + '</td>' +
+                        '<td class="py-2 px-2 text-right"><button onclick="deleteDeposit(' + d.id + ')" class="text-red-400 hover:text-red-300 text-xs">' + t('delete') + '</button></td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            } catch { el.innerHTML = '<p class="text-red-400 text-center py-4">Error</p>'; }
+        }
+
+        async function addDeposit() {
+            const station = document.getElementById('deposit-station').value.trim();
+            const amount = parseFloat(document.getElementById('deposit-amount').value);
+            const method = document.getElementById('deposit-method').value;
+            if (!station || !amount || amount <= 0) { toast(t('error')); return; }
+            try {
+                const res = await fetch('/api/inventory/deposits', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({station_name: station, amount, method})
+                });
+                if (res.ok) {
+                    document.getElementById('deposit-station').value = '';
+                    document.getElementById('deposit-amount').value = '';
+                    loadDeposits();
+                    logActivity('deposit/' + method.toLowerCase(), station + ': ' + amount);
+                } else { const e = await res.json(); toast(t('error') + ': ' + (e.detail || '')); }
+            } catch { toast(t('error')); }
+        }
+
+        async function deleteDeposit(id) {
+            try {
+                await fetch('/api/inventory/deposits/' + id, {method: 'DELETE'});
+                loadDeposits();
+            } catch { toast(t('error')); }
+        }
+
+        function populateDepositStations() {
+            const stations = window._stationData || [];
+            const dl = document.getElementById('deposit-station-list');
+            if (dl && stations.length) {
+                dl.innerHTML = '';
+                const seen = new Set();
+                stations.forEach(s => {
+                    if (!seen.has(s.station)) {
+                        seen.add(s.station);
+                        const o = document.createElement('option');
+                        o.value = s.station;
+                        dl.appendChild(o);
+                    }
+                });
+            }
         }
 
         applyTranslation();
@@ -3239,6 +3447,7 @@
         loadActiveUsers();
         setInterval(loadActiveUsers, 10000);
         connectChat();
+        logActivity('login', 'logged in');
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/static/sw.js').catch(() => {});
         }

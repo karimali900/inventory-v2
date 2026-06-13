@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -112,6 +112,17 @@ chat_manager = ConnectionManager()
 
 # ─── Active Sessions Tracking ──────────────────────────────────────
 active_sessions: dict = {}
+from collections import deque
+activity_log: deque = deque(maxlen=100)
+
+def add_activity(username: str, branch: str, action: str, details: str = ""):
+    activity_log.append({
+        "username": username,
+        "branch": branch,
+        "action": action,
+        "details": details,
+        "timestamp": datetime.utcnow().isoformat(),
+    })
 
 def get_client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
@@ -336,8 +347,16 @@ class InventoryBranch:
         self.router.add_api_route("/api/inventory/vehicles", self.create_vehicle, methods=["POST"])
         self.router.add_api_route("/api/inventory/vehicles/{vehicle_id}/location", self.update_vehicle_location, methods=["PUT"])
         self.router.add_api_route("/api/inventory/vehicles/{vehicle_id}", self.delete_vehicle, methods=["DELETE"])
+        self.router.add_api_route("/api/inventory/fleet-status", self.list_fleet_status, methods=["GET"])
+        self.router.add_api_route("/api/inventory/fleet-status", self.update_fleet_status, methods=["PUT"])
+        self.router.add_api_route("/api/inventory/deposits", self.list_deposits, methods=["GET"])
+        self.router.add_api_route("/api/inventory/deposits", self.create_deposit, methods=["POST"])
+        self.router.add_api_route("/api/inventory/deposits/{deposit_id}", self.delete_deposit, methods=["DELETE"])
         self.router.add_api_route("/api/inventory/ostool-operations", self.get_ostool_operations, methods=["GET"])
         self.router.add_api_route("/api/inventory/ostool-operations/email", self.send_ostool_email, methods=["POST"])
+        self.router.add_api_route("/api/inventory/ostool-attachments", self.list_ostool_attachments, methods=["GET"])
+        self.router.add_api_route("/api/inventory/ostool-attachments", self.upload_ostool_attachment, methods=["POST"])
+        self.router.add_api_route("/api/inventory/ostool-attachments/{attach_id}", self.delete_ostool_attachment, methods=["DELETE"])
         self.router.add_api_route("/api/inventory/distances-search", self.search_distances_files, methods=["GET"])
         self.router.add_api_route("/api/active-users", self.get_active_users, methods=["GET"])
 
@@ -420,7 +439,37 @@ class InventoryBranch:
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS station_deposits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                station_name TEXT NOT NULL,
+                amount REAL NOT NULL DEFAULT 0,
+                method TEXT NOT NULL CHECK(method IN ('Swift','Deposit')),
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS fleet_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL UNIQUE,
+                count INTEGER NOT NULL DEFAULT 0,
+                notes TEXT DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
         """)
+        # Seed default fleet status records
+        default_categories = [
+            'Registered vehicles',
+            'Inside the factory',
+            'Outside the factory',
+            'On the road - Going',
+            'On the road - Returning',
+            'Maintenance / Breakdown',
+        ]
+        for cat in default_categories:
+            try:
+                conn.execute("INSERT OR IGNORE INTO fleet_status (category, count) VALUES (?, 0)", (cat,))
+            except:
+                pass
+        conn.commit()
         # Add archived column if upgrading existing DB
         try:
             conn.execute("ALTER TABLE items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
@@ -440,6 +489,17 @@ class InventoryBranch:
             pass
         try:
             conn.execute("ALTER TABLE distributions ADD COLUMN remarks TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            conn.execute("""CREATE TABLE IF NOT EXISTS ostool_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                file_size INTEGER NOT NULL DEFAULT 0,
+                upload_date TEXT NOT NULL DEFAULT (datetime('now')),
+                ostool_date TEXT NOT NULL DEFAULT ''
+            )""")
         except Exception:
             pass
         conn.close()
@@ -1048,6 +1108,62 @@ class InventoryBranch:
         conn.close()
         return {"ok": True}
 
+    # ─── Fleet Status ───
+    async def list_fleet_status(self):
+        conn = self.db()
+        rows = conn.execute("SELECT * FROM fleet_status ORDER BY id").fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    async def update_fleet_status(self, body: dict):
+        cat = body.get("category", "").strip()
+        count = body.get("count")
+        if not cat or count is None:
+            raise HTTPException(400, "category and count required")
+        conn = self.db()
+        conn.execute("UPDATE fleet_status SET count=?, notes=?, updated_at=datetime('now') WHERE category=?", (int(count), body.get("notes", ""), cat))
+        conn.commit()
+        row = conn.execute("SELECT * FROM fleet_status WHERE category=?", (cat,)).fetchone()
+        conn.close()
+        if not row:
+            raise HTTPException(404, "Category not found")
+        return dict(row)
+
+    # ─── Station Deposits ───
+    async def list_deposits(self):
+        conn = self.db()
+        rows = conn.execute("SELECT * FROM station_deposits ORDER BY created_at DESC").fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    async def create_deposit(self, body: dict):
+        station = body.get("station_name", "").strip()
+        amount = float(body.get("amount", 0))
+        method = body.get("method", "Deposit")
+        notes = body.get("notes", "").strip()
+        if not station or amount <= 0:
+            raise HTTPException(400, "Station name and positive amount required")
+        if method not in ("Swift", "Deposit"):
+            raise HTTPException(400, "Method must be Swift or Deposit")
+        conn = self.db()
+        conn.execute(
+            "INSERT INTO station_deposits (station_name, amount, method, notes) VALUES (?,?,?,?)",
+            (station, amount, method, notes),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM station_deposits WHERE id=?",
+            (conn.execute("SELECT last_insert_rowid()").fetchone()[0],)).fetchone()
+        conn.close()
+        add_activity("system", self.name, f"deposit/{method.lower()}", f"{station}: {amount}")
+        return dict(row)
+
+    async def delete_deposit(self, deposit_id: int):
+        conn = self.db()
+        conn.execute("DELETE FROM station_deposits WHERE id=?", (deposit_id,))
+        conn.commit()
+        conn.close()
+        return {"ok": True}
+
     # ─── Ostool Operations ───
     def _ostool_where(self):
         return "(d.transportation_company LIKE '%ostool%' OR d.transportation_company LIKE '%Ostool%' OR d.transportation_company LIKE '%اسطول%')"
@@ -1228,6 +1344,45 @@ class InventoryBranch:
             return {"ok": False, "error": err}
         return {"ok": True, "sent_to": to_emails}
 
+    # ─── Ostool Attachments ───
+    async def list_ostool_attachments(self, date: str = ""):
+        conn = self.db()
+        if date:
+            rows = conn.execute("SELECT * FROM ostool_attachments WHERE ostool_date=? ORDER BY upload_date DESC", (date,)).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM ostool_attachments ORDER BY upload_date DESC").fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    async def upload_ostool_attachment(self, file: UploadFile = File(...), ostool_date: str = ""):
+        import uuid
+        ext = Path(file.filename).suffix if file.filename else ""
+        stored_name = uuid.uuid4().hex + ext
+        path = UPLOAD_DIR / stored_name
+        content = await file.read()
+        path.write_bytes(content)
+        conn = self.db()
+        cur = conn.execute(
+            "INSERT INTO ostool_attachments (filename, original_name, file_size, ostool_date) VALUES (?,?,?,?)",
+            (stored_name, file.filename or stored_name, len(content), ostool_date or ""),
+        )
+        conn.commit()
+        attach_id = cur.lastrowid
+        conn.close()
+        return {"id": attach_id, "filename": stored_name, "original_name": file.filename, "url": f"/uploads/{stored_name}"}
+
+    async def delete_ostool_attachment(self, attach_id: int):
+        conn = self.db()
+        row = conn.execute("SELECT filename FROM ostool_attachments WHERE id=?", (attach_id,)).fetchone()
+        if row:
+            fpath = UPLOAD_DIR / row["filename"]
+            if fpath.exists():
+                fpath.unlink()
+            conn.execute("DELETE FROM ostool_attachments WHERE id=?", (attach_id,))
+            conn.commit()
+        conn.close()
+        return {"ok": True}
+
     async def search_distances_files(self, q: str = ""):
         distances_dir = Path(__file__).parent.parent / "distances"
         if not distances_dir.exists():
@@ -1288,7 +1443,6 @@ UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
 os.makedirs(STATIC_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 from fastapi.staticfiles import StaticFiles
-from fastapi import UploadFile, File
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
@@ -1460,6 +1614,14 @@ async def dashboard_summary():
             low = [dict(r) for r in rows if r["current_stock"] <= r["warning_threshold"]]
             total = sum(r["current_stock"] for r in rows)
             vehicles = conn.execute("SELECT * FROM vehicles ORDER BY name").fetchall()
+            try:
+                fleet = conn.execute("SELECT * FROM fleet_status ORDER BY id").fetchall()
+            except:
+                fleet = []
+            try:
+                deposits = conn.execute("SELECT * FROM station_deposits ORDER BY created_at DESC LIMIT 20").fetchall()
+            except:
+                deposits = []
             conn.close()
             return {
                 "branch": branch,
@@ -1467,16 +1629,49 @@ async def dashboard_summary():
                 "alerts": low,
                 "total_stock": total,
                 "vehicles": [dict(r) for r in vehicles],
+                "fleet_status": [dict(r) for r in fleet],
+                "deposits": [dict(r) for r in deposits],
             }
         except:
-            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0, "vehicles": []}
+            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0, "vehicles": [], "deposits": [], "fleet_status": []}
     bani_data = await fetch_branch_data("bani")
     alex_data = await fetch_branch_data("alex")
     return {
         "bani": bani_data,
         "alex": alex_data,
         "active_users": list(active_sessions.values()),
+        "activity_log": list(activity_log),
     }
+
+@app.get("/api/control-room-report")
+async def control_room_report():
+    from datetime import date as dt_date
+    today = dt_date.today().isoformat()
+    async def fetch_report(branch):
+        try:
+            db_path = Path(branch + ".db")
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            items = conn.execute("SELECT * FROM items WHERE archived=0 ORDER BY name").fetchall()
+            items_data = []
+            for item in items:
+                d = dict(item)
+                adds = conn.execute("SELECT COALESCE(SUM(quantity),0) FROM transactions WHERE item_id=? AND DATE(created_at)=? AND type='add'", (item["id"], today)).fetchone()[0]
+                dists = conn.execute("SELECT COALESCE(SUM(weight),0) FROM distributions WHERE item_id=? AND DATE(created_at)=?", (item["id"], today)).fetchone()[0]
+                d["today_additions"] = adds
+                d["today_distributions"] = dists
+                items_data.append(d)
+            dist_by_station = conn.execute("SELECT station, SUM(weight) as total FROM distributions WHERE status='completed' AND DATE(created_at)=? GROUP BY station ORDER BY total DESC", (today,)).fetchall()
+            conn.close()
+            return {
+                "items": items_data,
+                "distributions_by_station": [dict(r) for r in dist_by_station],
+            }
+        except:
+            return {"items": [], "distributions_by_station": []}
+    bani = await fetch_report("bani")
+    alex = await fetch_report("alex")
+    return {"bani": bani, "alex": alex, "report_date": today}
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -1487,6 +1682,64 @@ async def upload_file(file: UploadFile = File(...)):
     content = await file.read()
     path.write_bytes(content)
     return {"url": f"/uploads/{name}", "name": file.filename or name}
+
+@app.get("/api/activity-log")
+async def get_activity_log():
+    return list(activity_log)
+
+@app.post("/api/activity-log")
+async def post_activity(body: dict):
+    username = body.get("username", "unknown")
+    branch = body.get("branch", "")
+    action = body.get("action", "")
+    details = body.get("details", "")
+    add_activity(username, branch, action, details)
+    return {"ok": True}
+
+@app.post("/api/check-email")
+async def check_email(body: dict = {}):
+    email_addr = body.get("email", "masria.basem@hotmail.com")
+    password = body.get("password", "maged@2017")
+    try:
+        import imaplib
+        import email as eml
+        from email.header import decode_header
+        mail = imaplib.IMAP4_SSL("imap-mail.outlook.com", 993)
+        mail.login(email_addr, password)
+        mail.select("inbox")
+        status, messages = mail.search(None, "UNSEEN")
+        results = []
+        if status == "OK":
+            for num in messages[0].split()[-10:]:
+                status, data = mail.fetch(num, "(RFC822)")
+                if status != "OK":
+                    continue
+                msg = eml.message_from_bytes(data[0][1])
+                subject = ""
+                for part in decode_header(msg["Subject"] or ""):
+                    if isinstance(part[0], bytes):
+                        subject += part[0].decode(part[1] or "utf-8", errors="replace")
+                    else:
+                        subject += str(part[0])
+                sender = msg["From"] or ""
+                date = msg["Date"] or ""
+                attachments = []
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        if part.get_content_disposition() == "attachment":
+                            fn = part.get_filename()
+                            if fn:
+                                import uuid
+                                ext = Path(fn).suffix
+                                stored = uuid.uuid4().hex + ext
+                                fpath = UPLOAD_DIR / stored
+                                fpath.write_bytes(part.get_payload(decode=True) or b"")
+                                attachments.append({"original": fn, "stored": stored, "url": f"/uploads/{stored}"})
+                results.append({"subject": subject, "from": sender, "date": date, "attachments": attachments})
+        mail.logout()
+        return {"ok": True, "count": len(results), "emails": results}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 @app.get("/branches", response_class=HTMLResponse)
 @app.get("/branches/", response_class=HTMLResponse)

@@ -17,7 +17,7 @@
         .dash-header { width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .stats-row { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
         .stats-row-2 { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .chart-wrap { width: 100%; background: rgba(15,23,42,0.6); border: 1px solid #1e293b; border-radius: 12px; padding: 12px; position: relative; }
+        .chart-wrap { width: 100%; background: rgba(15,23,42,0.6); border: 1px solid #1e293b; border-radius: 12px; padding: 8px; position: relative; overflow: hidden; }
         .bottom-row { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
         #clock { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: bold; color: #fbbf24; letter-spacing: 0.08em; }
         .stat-label { font-size: 0.8rem; letter-spacing: 0.05em; }
@@ -31,6 +31,8 @@
         .toast-container { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
         .toast { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; background: rgba(220,38,38,0.9); border: 1px solid #f87171; color: #fff; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes ticker-scroll { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+        #activity-ticker { animation: ticker-scroll 30s linear infinite; }
         ::-webkit-scrollbar { width: 0; }
         .rtl { direction: rtl; }
         @media (max-width: 768px) {
@@ -53,6 +55,10 @@
             <div class="flex items-center gap-3" style="font-size:0.8rem;color:#94a3b8;">
                 <span id="last-updated-monitor"></span>
                 <span class="flex items-center gap-1"><span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> <span id="status-text">Live</span></span>
+                <label class="flex items-center gap-1 cursor-pointer select-none" title="Voice Reader">
+                    <span id="reader-label" style="font-size:0.65rem;">🔊</span>
+                    <input type="checkbox" id="voice-toggle" onchange="toggleVoiceReader(this.checked)" style="accent-color:#fbbf24;">
+                </label>
                 <button onclick="toggleLangMon()" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded font-bold transition" id="lang-btn-mon" style="font-size:0.8rem;">عربي</button>
                 <a href="/" class="text-sky-400 hover:text-sky-300 transition" id="back-link">← Back</a>
             </div>
@@ -69,8 +75,9 @@
             <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-online">Online</div><div class="stat-value text-emerald-400" id="stat-users">0</div></div>
         </div>
 
-        <div class="chart-wrap">
-            <canvas id="stockChart" height="280"></canvas>
+        <div class="chart-wrap" style="max-height:200px;display:flex;gap:10px;align-items:stretch;">
+            <div id="chart-summary" style="flex-shrink:0;width:110px;overflow-y:auto;font-size:0.6rem;color:#94a3b8;border-right:1px solid #1e293b;padding-right:6px;display:flex;flex-direction:column;gap:3px;"></div>
+            <canvas id="stockChart" height="160" style="flex:1;"></canvas>
         </div>
 
         <div class="bottom-row">
@@ -83,8 +90,15 @@
                 <div id="overview-list" class="flex flex-col gap-2 overflow-y-auto" style="max-height:200px;"></div>
             </div>
             <div class="flex flex-col gap-2">
-                <div class="section-title font-bold text-emerald-400 uppercase tracking-wider" id="vehicles-heading">🚛 Vehicles</div>
-                <div id="vehicles-list" class="flex flex-col gap-2 overflow-y-auto" style="max-height:200px;"></div>
+                <div class="section-title font-bold text-violet-400 uppercase tracking-wider" id="report-panel-heading">📋 Stock Levels</div>
+                <div id="report-panel" class="flex flex-col gap-1 overflow-y-auto" style="max-height:200px;font-size:0.7rem;"></div>
+            </div>
+        </div>
+
+        <div id="activity-feed" style="width:100%;max-width:1400px;background:linear-gradient(135deg,rgba(2,6,23,0.95),rgba(15,23,42,0.85));border:1px solid #0f172a;border-radius:10px;padding:10px 14px;overflow:hidden;white-space:nowrap;box-shadow:0 4px 32px rgba(0,0,0,0.5);">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="color:#fbbf24;font-weight:bold;font-size:0.7rem;flex-shrink:0;background:rgba(251,191,36,0.08);padding:2px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.15);letter-spacing:0.05em;" id="live-label">🔴 LIVE</span>
+                <div id="activity-ticker" style="color:#f1f5f9;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 6px rgba(0,0,0,0.6);"></div>
             </div>
         </div>
     </div>
@@ -97,31 +111,49 @@
         let prevAlerts = [];
         let audioCtx = null;
         let chartInstance = null;
+        let lastData = null;
+        let lastDataHash = '';
+        let lastChartBuild = 0;
+        const CHART_COOLDOWN = 30 * 60 * 1000;
 
         const i18n = {
             en: {
                 title: '🚀 Control Room',
                 clock: '🕐', back: '← Back', langBtn: 'عربي',
                 netStock: 'Net Stock (ton)', baniStock: 'Bani (ton)', alexStock: 'Alex (ton)', items: 'Items', alerts: 'Alerts', online: 'Online',
-                alertsTitle: '🚨 Alerts', overview: '📊 Overview', vehiclesTitle: '🚛 Vehicles',
+                alertsTitle: '🚨 Alerts', overview: '📊 Overview',
+                stockLevels: '📋 Stock Levels',
+                distByStation: 'Distributions by Station',
+                openingStock: 'Opening', todayAdditions: 'Adds', todayDistributions: 'Dists', currentStock: 'Current',
+                weight: 'Tons',
+                ok: 'OK',
                 allNormal: '✅ All stock levels normal',
                 threshold: 'Threshold', outOfStock: 'OUT OF STOCK', low: 'LOW',
                 usersOnline: 'Users Online', none: 'None', lowStock: 'LOW STOCK',
-                insideFactory: 'Inside the factory', outsideFactory: 'Outside the factory',
-                onWayThere: 'On the way there', onWayBack: 'On the way back', atLocation: 'At the location',
-                noVehicles: 'No vehicles',
+                deposit: 'Deposits',
+                fleetStatus: 'Fleet',
+                liveLabel: '🔴 LIVE',
+                baniLabel: 'Bani Sweif',
+                alexLabel: 'Alexandria',
             },
             ar: {
                 title: '🚀 غرفة التحكم',
                 clock: '🕐', back: '← رجوع', langBtn: 'English',
                 netStock: 'صافى المخزون (طن)', baniStock: 'بنى سويف (طن)', alexStock: 'الإسكندرية (طن)', items: 'الأصناف', alerts: 'إنذارات', online: 'متصلين',
                 alertsTitle: '🚨 إنذارات', overview: '📊 نظرة عامة', vehiclesTitle: '🚛 سيارات الاسطول',
+                stockLevels: '📋 مستويات المخزون',
+                distByStation: 'التوزيعات حسب المحطة',
+                openingStock: 'الافتتاحي', todayAdditions: 'الوارد', todayDistributions: 'المنصرف', currentStock: 'الحالي',
+                weight: 'الطن',
+                ok: 'طبيعي',
                 allNormal: '✅ كل الأصناف طبيعية',
                 threshold: 'حد الإنذار', outOfStock: 'نفذ من المخزون', low: 'منخفض',
                 usersOnline: 'المستخدمين المتصلين', none: 'لا يوجد', lowStock: 'مخزون منخفض',
-                insideFactory: 'داخل المصنع', outsideFactory: 'خارج المصنع',
-                onWayThere: 'في الطريق هناك', onWayBack: 'في طريق العودة', atLocation: 'في الموقع',
-                noVehicles: 'لا توجد سيارات',
+                deposit: 'إيداعات',
+                fleetStatus: 'الاسطول',
+                liveLabel: '🔴 مباشر',
+                baniLabel: 'بنى سويف',
+                alexLabel: 'الإسكندرية',
             }
         };
 
@@ -139,7 +171,7 @@
             document.getElementById('label-online').textContent = t('online');
             document.getElementById('alerts-heading').textContent = t('alertsTitle');
             document.getElementById('overview-heading').textContent = t('overview');
-            document.getElementById('vehicles-heading').textContent = t('vehiclesTitle');
+            document.getElementById('live-label').textContent = t('liveLabel');
             document.body.classList.toggle('rtl', currentLang === 'ar');
             if (lastData) renderDashboard(lastData);
         }
@@ -184,6 +216,161 @@
             } catch {}
         }
 
+        function playCabinChime() {
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioCtx.currentTime;
+                // Two-tone chime: 660Hz then 880Hz with slight overlap
+                [660, 880].forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.type = 'sine'; osc.frequency.value = freq;
+                    const t = now + i * 0.2;
+                    gain.gain.setValueAtTime(0.25, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                    osc.start(t);
+                    osc.stop(t + 0.5);
+                });
+            } catch {}
+        }
+
+        let cachedArabicVoice = null;
+        let cachedArabicLoaded = false;
+
+        function loadArabicVoice() {
+            if (!window.speechSynthesis) return;
+            const voices = window.speechSynthesis.getVoices();
+            const arabic = voices.find(v => v.lang.startsWith('ar'));
+            if (arabic) {
+                cachedArabicVoice = arabic;
+                cachedArabicLoaded = true;
+            }
+        }
+        loadArabicVoice();
+        if (window.speechSynthesis) {
+            window.speechSynthesis.onvoiceschanged = loadArabicVoice;
+        }
+
+        function speakText(text) {
+            if (!text || !window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            // Ensure Arabic voice is loaded for Arabic mode
+            if (currentLang === 'ar' && !cachedArabicLoaded) {
+                loadArabicVoice();
+            }
+            const sentences = text.split(/(?<=[.۔])/).map(s => s.trim()).filter(Boolean);
+            sentences.forEach((s, i) => {
+                setTimeout(() => {
+                    if (!voiceReaderActive) return;
+                    const utter = new SpeechSynthesisUtterance(s);
+                    utter.rate = 0.75;
+                    utter.pitch = 1.0;
+                    utter.volume = 1;
+                    if (currentLang === 'ar') {
+                        if (cachedArabicVoice) utter.voice = cachedArabicVoice;
+                        utter.lang = 'ar-SA';
+                    } else {
+                        utter.lang = 'en-US';
+                    }
+                    window.speechSynthesis.speak(utter);
+                }, i * 2000);
+            });
+        }
+
+        function generateVoiceSummary(data) {
+            if (!data) return '';
+            const parts = [];
+            const lang = currentLang;
+            const baniItems = data.bani?.items || [];
+            const alexItems = data.alex?.items || [];
+            const baniDeposits = data.bani?.deposits || [];
+            const alexDeposits = data.alex?.deposits || [];
+
+            if (lang === 'ar') {
+                // Stock summary for Bani
+                if (baniItems.length) {
+                    const items = baniItems.map(i => i.name + ' ' + Number(i.current_stock).toFixed(1) + ' طن').join('، ');
+                    parts.push('بنى سويف: ' + items);
+                }
+                // Stock summary for Alex
+                if (alexItems.length) {
+                    const items = alexItems.map(i => i.name + ' ' + Number(i.current_stock).toFixed(1) + ' طن').join('، ');
+                    parts.push('الإسكندرية: ' + items);
+                }
+                // Alerts
+                const allAlerts = [...(data.bani?.alerts || []), ...(data.alex?.alerts || [])];
+                if (allAlerts.length) {
+                    const alertTexts = allAlerts.map(i => i.name + ' ' + Number(i.current_stock).toFixed(1) + ' طن').join('، ');
+                    parts.push('إنذار مخزون منخفض: ' + alertTexts);
+                }
+                // Recent deposits
+                const allDeposits = [...baniDeposits, ...alexDeposits];
+                if (allDeposits.length) {
+                    const depTexts = allDeposits.slice(0, 5).map(d =>
+                        d.station_name + ' ' + Number(d.amount).toFixed(1) + ' طن' + (d.method ? ' ' + d.method : '')
+                    ).join('، ');
+                    parts.push('آخر الإيداعات: ' + depTexts);
+                }
+            } else {
+                // Stock summary for Bani
+                if (baniItems.length) {
+                    const items = baniItems.map(i => i.name + ' ' + Number(i.current_stock).toFixed(1) + ' tons').join(', ');
+                    parts.push('Bani Sweif: ' + items);
+                }
+                // Stock summary for Alex
+                if (alexItems.length) {
+                    const items = alexItems.map(i => i.name + ' ' + Number(i.current_stock).toFixed(1) + ' tons').join(', ');
+                    parts.push('Alexandria: ' + items);
+                }
+                // Alerts
+                const allAlerts = [...(data.bani?.alerts || []), ...(data.alex?.alerts || [])];
+                if (allAlerts.length) {
+                    const alertTexts = allAlerts.map(i => i.name + ' at ' + Number(i.current_stock).toFixed(1) + ' tons').join(', ');
+                    parts.push('Low stock alerts: ' + alertTexts);
+                }
+                // Recent deposits (transfers from stations)
+                const allDeposits = [...baniDeposits, ...alexDeposits];
+                if (allDeposits.length) {
+                    const depTexts = allDeposits.slice(0, 5).map(d =>
+                        d.station_name + ' ' + Number(d.amount).toFixed(1) + ' tons' + (d.method ? ' via ' + d.method : '')
+                    ).join(', ');
+                    parts.push('Latest transfers: ' + depTexts);
+                }
+            }
+            return parts.join('. ') + '.';
+        }
+
+        let voiceReaderTimer = null;
+        let voiceReaderActive = false;
+
+        function toggleVoiceReader(on) {
+            voiceReaderActive = on;
+            document.getElementById('reader-label').textContent = on ? '🔊' : '🔇';
+            if (on && lastData) {
+                clearTimeout(window._voiceReaderTimeout);
+                clearInterval(voiceReaderTimer);
+                window._voiceReaderTimeout = setTimeout(() => {
+                    const t = generateVoiceSummary(lastData);
+                    if (t) speakText(t);
+                    voiceReaderTimer = setInterval(() => {
+                        if (lastData && voiceReaderActive) {
+                            const t = generateVoiceSummary(lastData);
+                            if (t) speakText(t);
+                        }
+                    }, 180000);
+                }, 5000);
+            } else {
+                clearTimeout(window._voiceReaderTimeout);
+                if (voiceReaderTimer) { clearInterval(voiceReaderTimer); voiceReaderTimer = null; }
+                window.speechSynthesis?.cancel();
+            }
+        }
+
+        function scheduleVoiceReader(data) {
+            if (voiceReaderActive) toggleVoiceReader(true);
+        }
+
         function updateClock() {
             document.getElementById('clock').textContent = new Date().toLocaleTimeString(currentLang === 'ar' ? 'ar-EG' : 'en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
         }
@@ -199,51 +386,176 @@
 
         function esc(s) { return String(s).replace(/[&<>"]/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
 
-        let lastData = null;
+        function dataHash(d) {
+            try {
+                const items = [...(d.bani?.items || []).map(i => i.id + ':' + i.current_stock), ...(d.alex?.items || []).map(i => i.id + ':' + i.current_stock)];
+                items.sort();
+                return items.join(',');
+            } catch { return ''; }
+        }
+
+        const COLOR_PALETTE = [
+            '#f97316','#eab308','#22c55e','#06b6d4','#8b5cf6','#ec4899','#f43f5e','#14b8a6',
+            '#f59e0b','#84cc16','#10b981','#3b82f6','#a855f7','#d946ef','#64748b','#0ea5e9',
+            '#fb923c','#a3e635','#34d399','#38bdf8','#c084fc','#f472b6','#fb7185','#2dd4bf',
+        ];
+        function nameColor(name) {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) h = ((h << 5) - h) + name.charCodeAt(i);
+            const idx = Math.abs(h) % COLOR_PALETTE.length;
+            return COLOR_PALETTE[idx];
+        }
 
         function buildChart(data) {
             const bani = data.bani?.items || [];
             const alex = data.alex?.items || [];
-            const entries = [
-                ...bani.map(i => ({ label: i.name + '  [bani]', value: i.current_stock, color: '#f59e0b' })),
-                ...alex.map(i => ({ label: i.name + '  [alex]', value: i.current_stock, color: '#38bdf8' })),
-            ];
-            entries.sort((a, b) => b.value - a.value);
+            const brLabel = currentLang === 'ar' ? 'بنى' : 'bani';
+            const alLabel = currentLang === 'ar' ? 'اسك' : 'alex';
 
-            if (chartInstance) chartInstance.destroy();
-            const ctx = document.getElementById('stockChart').getContext('2d');
+            const baniSorted = [...bani].sort((a, b) => b.current_stock - a.current_stock);
+            const alexSorted = [...alex].sort((a, b) => b.current_stock - a.current_stock);
+
+            const baniCount = baniSorted.length;
+            const alexCount = alexSorted.length;
+
+            // Build summary panel on left
+            const summaryEl = document.getElementById('chart-summary');
+            const combined = {};
+            [...bani, ...alex].forEach(i => {
+                if (!combined[i.name]) combined[i.name] = { total: 0, count: 0 };
+                combined[i.name].total += i.current_stock;
+                combined[i.name].count++;
+            });
+            const sortedNames = Object.keys(combined).sort((a, b) => combined[b].total - combined[a].total);
+            summaryEl.innerHTML = '<div style="color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;font-size:0.6rem;padding-bottom:4px;border-bottom:1px solid #1e293b;">' + (currentLang === 'ar' ? 'ملخص المخزون' : 'STOCK SUMMARY') + '</div>' +
+                sortedNames.map(n => {
+                    const c = combined[n];
+                    const color = nameColor(n);
+                    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
+                        '<span style="color:' + color + ';font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75px;" title="' + esc(n) + '">' + esc(n) + '</span>' +
+                        '<span style="color:#e2e8f0;font-weight:700;flex-shrink:0;">' + c.total.toFixed(1) + '</span>' +
+                        '</div>';
+                }).join('') +
+                '<div style="border-top:1px solid #1e293b;margin-top:auto;padding-top:4px;display:flex;justify-content:space-between;font-weight:700;"><span style="color:#94a3b8;">' + (currentLang === 'ar' ? 'الإجمالى' : 'Total') + '</span><span style="color:#fbbf24;">' + sortedNames.reduce((s, n) => s + combined[n].total, 0).toFixed(1) + '</span></div>';
+
+            const allLabels = [
+                ...baniSorted.map(i => i.name + '  [' + brLabel + ']'),
+                ...alexSorted.map(i => i.name + '  [' + alLabel + ']'),
+            ];
+
+            const allValues = [
+                ...baniSorted.map(i => i.current_stock),
+                ...alexSorted.map(i => i.current_stock),
+            ];
+
+            const allColors = [
+                ...baniSorted.map(i => nameColor(i.name)),
+                ...alexSorted.map(i => nameColor(i.name)),
+            ];
+
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            const canvas = document.getElementById('stockChart');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             chartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: entries.map(e => e.label),
+                    labels: allLabels,
                     datasets: [{
-                        data: entries.map(e => e.value),
-                        backgroundColor: entries.map(e => e.color),
-                        borderRadius: 4,
+                        data: allValues,
+                        backgroundColor: allColors,
+                        borderRadius: 3,
                         borderSkipped: false,
+                        clip: false,
+                        barPercentage: 0.5,
+                        categoryPercentage: 0.95,
                     }]
                 },
                 options: {
-                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: true,
+                    layout: {
+                        padding: { left: 10, right: 10 }
+                    },
+                    animation: {
+                        duration: 600,
+                        easing: 'easeOutQuart',
+                        delay: function(context) {
+                            const i = context.dataIndex;
+                            if (i < baniCount) return i * 40;
+                            return 400 + (i - baniCount) * 40;
+                        }
+                    },
                     plugins: {
                         legend: { display: false },
                         datalabels: {
+                            display: function(ctx) {
+                                return ctx.dataset.data[ctx.dataIndex] > 0;
+                            },
                             anchor: 'end',
                             align: 'end',
+                            offset: -2,
                             color: '#e2e8f0',
-                            font: { size: 12, weight: 'bold' },
+                            font: { size: 7, weight: 'bold' },
                             formatter: v => v.toFixed(1),
                         }
                     },
                     scales: {
-                        x: { beginAtZero: true, ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: '#1e293b' } },
-                        y: { ticks: { color: '#94a3b8', font: { size: 12 } }, grid: { display: false } }
+                        x: {
+                            offset: true,
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { size: 11, weight: 'bold' },
+                                maxRotation: 30,
+                                minRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 20,
+                            },
+                            grid: { display: false }
+                        },
+                        y: { beginAtZero: true, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#1e293b' } }
                     }
                 },
                 plugins: [ChartDataLabels]
             });
+        }
+
+        function buildTickerContent(data) {
+            const log = data.activity_log || [];
+            const stockParts = [];
+            if (data.bani?.items?.length) {
+                const items = data.bani.items.map(i => '<span style="color:' + nameColor(i.name) + ';font-weight:600;">' + esc(i.name) + '</span>=<span style="color:#e2e8f0;font-weight:600;">' + Number(i.current_stock).toFixed(1) + '</span>').join(' <span style="color:#475569;">│</span> ');
+                stockParts.push('<span style="color:#f59e0b;font-weight:600;">' + esc(t('baniLabel')) + '</span> <span style="color:#fbbf24;">»</span> ' + items);
+            }
+            if (data.alex?.items?.length) {
+                const items = data.alex.items.map(i => '<span style="color:' + nameColor(i.name) + ';font-weight:600;">' + esc(i.name) + '</span>=<span style="color:#e2e8f0;font-weight:600;">' + Number(i.current_stock).toFixed(1) + '</span>').join(' <span style="color:#475569;">│</span> ');
+                stockParts.push('<span style="color:#38bdf8;font-weight:600;">' + esc(t('alexLabel')) + '</span> <span style="color:#7dd3fc;">»</span> ' + items);
+            }
+            const stockStr = stockParts.length
+                ? '<span style="color:#94a3b8;">📦</span> ' + stockParts.join(' <span style="color:#475569;font-weight:bold;">┃</span> ')
+                : '';
+            // Fleet status segment
+            const baniFleet = data.bani?.fleet_status || [];
+            const alexFleet = data.alex?.fleet_status || [];
+            const fleetMap = {};
+            baniFleet.forEach(f => { fleetMap['bani_' + f.category] = f.count; });
+            alexFleet.forEach(f => { fleetMap['alex_' + f.category] = f.count; });
+            const fleetStr = (baniFleet.length || alexFleet.length)
+                ? '<span style="color:#a78bfa;">🚛</span> <span style="color:#f59e0b;font-weight:600;">' + esc(t('baniLabel')) + '</span> <span style="color:#a78bfa;">Reg ' + (fleetMap['bani_Registered vehicles'] || 0) + ' 🏭 ' + (fleetMap['bani_Inside the factory'] || 0) + ' 🌍 ' + (fleetMap['bani_Outside the factory'] || 0) + '</span> <span style="color:#475569;font-weight:bold;">┃</span> <span style="color:#38bdf8;font-weight:600;">' + esc(t('alexLabel')) + '</span> <span style="color:#a78bfa;">Reg ' + (fleetMap['alex_Registered vehicles'] || 0) + ' 🏭 ' + (fleetMap['alex_Inside the factory'] || 0) + ' 🌍 ' + (fleetMap['alex_Outside the factory'] || 0) + '</span>'
+                : '';
+            const activityStr = log.length
+                ? log.slice().reverse().filter(a => !a.action || !a.action.startsWith('deposit/')).map(a => {
+                    const time = a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '';
+                    const branchColor = a.branch === 'bani' ? '#f59e0b' : '#38bdf8';
+                    return '<span style="color:#64748b;">[' + time + ']</span> <span style="color:' + branchColor + ';">' + esc(a.username) + '</span><span style="color:#475569;">@' + esc(a.branch) + '</span>: <span style="color:#e2e8f0;">' + esc(a.action) + '</span>' + (a.details ? ' <span style="color:#94a3b8;">—</span> <span style="color:#cbd5e1;">' + esc(a.details) + '</span>' : '');
+                }).join(' <span style="color:#334155;">│</span> ')
+                : '';
+            const parts = [];
+            if (stockStr) parts.push(stockStr);
+            if (fleetStr) parts.push(fleetStr);
+            if (activityStr) parts.push(activityStr);
+            const bullet = currentLang === 'ar' ? ' ● ' : '  ◆  ';
+            return parts.join('<span style="color:#334155;">' + bullet + bullet + '</span>') || '…';
         }
 
         async function fetchDashboard() {
@@ -255,8 +567,14 @@
             } catch (e) { console.error('fetch error', e); }
         }
 
+        let voiceReaderStarted = false;
+
         function renderDashboard(data) {
             if (!data) return;
+            if (!voiceReaderStarted) {
+                voiceReaderStarted = true;
+                scheduleVoiceReader(data);
+            }
             const allAlerts = [...(data.bani?.alerts || []).map(i => ({...i, branch: 'bani'})), ...(data.alex?.alerts || []).map(i => ({...i, branch: 'alex'}))];
             const totalStock = (parseFloat(data.bani?.total_stock) || 0) + (parseFloat(data.alex?.total_stock) || 0);
             const totalItems = (data.bani?.items?.length || 0) + (data.alex?.items?.length || 0);
@@ -284,13 +602,6 @@
                 }).join('')
                 : '<div class="text-slate-500 text-center py-6" style="font-size:1rem;">' + t('allNormal') + '</div>';
 
-            const baniLow = data.bani?.alerts?.length || 0;
-            const alexLow = data.alex?.alerts?.length || 0;
-            document.getElementById('overview-list').innerHTML =
-                '<div class="stat-box" style="padding:12px 16px;"><div style="font-size:0.8rem;color:#94a3b8;">بنى سويف</div><div class="font-bold text-amber-400" style="font-size:clamp(1rem,2vw,1.4rem);">' + t('items') + ': ' + (data.bani?.items?.length || 0) + ' / ' + t('alerts') + ': ' + baniLow + '</div></div>' +
-                '<div class="stat-box" style="padding:12px 16px;"><div style="font-size:0.8rem;color:#94a3b8;">الإسكندرية</div><div class="font-bold text-amber-400" style="font-size:clamp(1rem,2vw,1.4rem);">' + t('items') + ': ' + (data.alex?.items?.length || 0) + ' / ' + t('alerts') + ': ' + alexLow + '</div></div>' +
-                '<div class="stat-box" style="padding:12px 16px;"><div style="font-size:0.8rem;color:#94a3b8;">' + t('usersOnline') + '</div><div class="font-bold text-emerald-400" style="font-size:clamp(1rem,2vw,1.4rem);">' + ((data.active_users || []).map(u => esc(u.username)).join(', ') || t('none')) + '</div></div>';
-
             const alertKeys = allAlerts.map(i => i.id + '-' + i.branch + '-' + i.current_stock).sort().join(',');
             const prevKeys = prevAlerts.map(i => i.id + '-' + i.branch + '-' + i.current_stock).sort().join(',');
             if (prevAlerts.length && alertKeys !== prevKeys && allAlerts.length > prevAlerts.length) {
@@ -300,37 +611,115 @@
             }
             prevAlerts = allAlerts;
 
-            // ─── Vehicles ───
-            const allVehicles = [
-                ...(data.bani?.vehicles || []).map(v => ({...v, branch: 'bani'})),
-                ...(data.alex?.vehicles || []).map(v => ({...v, branch: 'alex'})),
+            // ─── Deposits ───
+            const allDeposits = [
+                ...(data.bani?.deposits || []).map(d => ({...d, branch: 'bani'})),
+                ...(data.alex?.deposits || []).map(d => ({...d, branch: 'alex'})),
             ];
-            const vehEl = document.getElementById('vehicles-list');
-            if (!allVehicles.length) {
-                vehEl.innerHTML = '<div class="text-slate-500 text-center py-6" style="font-size:1rem;">' + t('noVehicles') + '</div>';
-            } else {
-                const locStyles = {
-                    'Inside the factory': 'bg-emerald-500',
-                    'Outside the factory': 'bg-amber-500',
-                    'On the way there': 'bg-sky-500',
-                    'On the way back': 'bg-purple-500',
-                    'At the location': 'bg-rose-500',
-                };
-                vehEl.innerHTML = allVehicles.map(v => {
-                    const locKey = v.current_location;
-                    const locLabel = t(locKey === 'Inside the factory' ? 'insideFactory' : locKey === 'Outside the factory' ? 'outsideFactory' : locKey === 'On the way there' ? 'onWayThere' : locKey === 'On the way back' ? 'onWayBack' : 'atLocation');
-                    const dot = locStyles[locKey] || 'bg-slate-500';
-                    return '<div class="stat-box" style="padding:10px 14px;display:flex;align-items:center;gap:10px;">' +
-                        '<span class="w-2.5 h-2.5 rounded-full ' + dot + ' flex-shrink-0"></span>' +
-                        '<div style="flex:1;min-width:0;"><div class="font-bold text-white" style="font-size:clamp(0.85rem,1.5vw,1.1rem);">' + esc(v.name) + '</div>' +
-                        '<div style="font-size:0.7rem;color:#94a3b8;">' + esc(v.plate_number || '—') + ' · [' + esc(v.branch) + ']</div></div>' +
-                        '<span style="font-size:0.75rem;color:' + (locKey === 'Inside the factory' ? '#34d399' : locKey === 'Outside the factory' ? '#f59e0b' : locKey === 'On the way there' ? '#38bdf8' : locKey === 'On the way back' ? '#c084fc' : '#fb7185') + ';font-weight:600;text-align:right;flex-shrink:0;">' + locLabel + '</span>' +
-                        '</div>';
-                }).join('');
-            }
+            const baniTotalDep = allDeposits.filter(d => d.branch === 'bani').reduce((s, d) => s + d.amount, 0);
+            const alexTotalDep = allDeposits.filter(d => d.branch === 'alex').reduce((s, d) => s + d.amount, 0);
+            const ovEl = document.getElementById('overview-list');
+            const baniLow = data.bani?.alerts?.length || 0;
+            const alexLow = data.alex?.alerts?.length || 0;
+            const baniFleet = data.bani?.fleet_status || [];
+            const alexFleet = data.alex?.fleet_status || [];
+            const fleetMap = {};
+            baniFleet.forEach(f => { fleetMap['bani_' + f.category] = f.count; });
+            alexFleet.forEach(f => { fleetMap['alex_' + f.category] = f.count; });
+            ovEl.innerHTML =
+                '<div class="stat-box" style="padding:10px 14px;"><div style="font-size:0.8rem;color:#94a3b8;">بنى سويف</div><div class="font-bold text-amber-400" style="font-size:clamp(0.9rem,1.8vw,1.3rem);">' + t('items') + ': ' + (data.bani?.items?.length || 0) + ' / ' + t('alerts') + ': ' + baniLow + '</div></div>' +
+                '<div class="stat-box" style="padding:8px 12px;border-color:#065f46;"><div style="font-size:0.75rem;color:#34d399;">💰 ' + t('deposit') + ': ' + baniTotalDep.toFixed(2) + '</div></div>' +
+                '<div class="stat-box" style="padding:8px 12px;border-color:#7c3aed;"><div style="font-size:0.75rem;color:#a78bfa;">🚛 ' + t('fleetStatus') + ': ' + (fleetMap['bani_Registered vehicles'] || 0) + ' / 🏭 ' + (fleetMap['bani_Inside the factory'] || 0) + ' / 🌍 ' + (fleetMap['bani_Outside the factory'] || 0) + '</div></div>' +
+                '<div class="stat-box" style="padding:10px 14px;"><div style="font-size:0.8rem;color:#94a3b8;">الإسكندرية</div><div class="font-bold text-amber-400" style="font-size:clamp(0.9rem,1.8vw,1.3rem);">' + t('items') + ': ' + (data.alex?.items?.length || 0) + ' / ' + t('alerts') + ': ' + alexLow + '</div></div>' +
+                '<div class="stat-box" style="padding:8px 12px;border-color:#065f46;"><div style="font-size:0.75rem;color:#34d399;">💰 ' + t('deposit') + ': ' + alexTotalDep.toFixed(2) + '</div></div>' +
+                '<div class="stat-box" style="padding:8px 12px;border-color:#7c3aed;"><div style="font-size:0.75rem;color:#a78bfa;">🚛 ' + t('fleetStatus') + ': ' + (fleetMap['alex_Registered vehicles'] || 0) + ' / 🏭 ' + (fleetMap['alex_Inside the factory'] || 0) + ' / 🌍 ' + (fleetMap['alex_Outside the factory'] || 0) + '</div></div>' +
+                '<div class="stat-box" style="padding:10px 14px;"><div style="font-size:0.8rem;color:#94a3b8;">' + t('usersOnline') + '</div><div class="font-bold text-emerald-400" style="font-size:clamp(0.9rem,1.8vw,1.3rem);">' + ((data.active_users || []).map(u => esc(u.username)).join(', ') || t('none')) + '</div></div>';
+
+            // ─── Ticker ───
+            const ticker = document.getElementById('activity-ticker');
+            const content = buildTickerContent(data);
+            ticker.innerHTML = content;
+            ticker.style.animation = 'none';
+            ticker.offsetHeight;
+            ticker.style.animation = 'ticker-scroll 30s linear infinite';
 
             document.getElementById('last-updated-monitor').textContent = t('clock') + ' ' + new Date().toLocaleTimeString();
-            buildChart(data);
+
+            // ─── Chart: rebuild every 30 min OR on data change ───
+            const now = Date.now();
+            const hash = dataHash(data);
+            const dataChanged = hash !== lastDataHash;
+            const timeExpired = now - lastChartBuild >= CHART_COOLDOWN;
+            if (dataChanged) {
+                playCabinChime();
+            }
+            if (dataChanged || timeExpired || !chartInstance) {
+                lastChartBuild = now;
+                lastDataHash = hash;
+                buildChart(data);
+            }
+        }
+
+        let lastReportJson = '';
+
+        function renderReportPanel(report) {
+            const el = document.getElementById('report-panel');
+            if (!el) return;
+            const json = JSON.stringify(report);
+            if (json === lastReportJson) return;
+            lastReportJson = json;
+            const allItems = [...(report.bani?.items || []).map(i => ({...i, branch: 'bani'})), ...(report.alex?.items || []).map(i => ({...i, branch: 'alex'}))];
+            const baniDist = report.bani?.distributions_by_station || [];
+            const alexDist = report.alex?.distributions_by_station || [];
+            let html = '';
+            html += '<div style="font-size:0.65rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:2px;border-bottom:1px solid #1e293b;margin-bottom:4px;">' + t('stockLevels') + '</div>';
+            if (allItems.length) {
+                html += '<table style="width:100%;border-collapse:collapse;">' +
+                    '<thead><tr style="color:#64748b;font-size:0.55rem;"><th style="text-align:left;padding:1px 2px;">' + t('items') + '</th>' +
+                    '<th style="text-align:right;padding:1px 2px;">' + t('openingStock') + '</th>' +
+                    '<th style="text-align:right;padding:1px 2px;">' + t('todayAdditions') + '</th>' +
+                    '<th style="text-align:right;padding:1px 2px;">' + t('todayDistributions') + '</th>' +
+                    '<th style="text-align:right;padding:1px 2px;">' + t('currentStock') + '</th></tr></thead><tbody>';
+                allItems.forEach(i => {
+                    const opening = i.current_stock - i.today_additions + i.today_distributions;
+                    const isLow = i.current_stock <= i.warning_threshold;
+                    html += '<tr style="border-bottom:1px solid #0f172a;">' +
+                        '<td style="text-align:left;padding:2px 2px;color:' + nameColor(i.name) + ';font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px;" title="' + esc(i.name) + '">' + esc(i.name) + '</td>' +
+                        '<td style="text-align:right;padding:2px 2px;color:#64748b;">' + opening.toFixed(1) + '</td>' +
+                        '<td style="text-align:right;padding:2px 2px;color:#34d399;">' + Number(i.today_additions).toFixed(1) + '</td>' +
+                        '<td style="text-align:right;padding:2px 2px;color:#fb7185;">' + Number(i.today_distributions).toFixed(1) + '</td>' +
+                        '<td style="text-align:right;padding:2px 2px;font-weight:700;color:' + (isLow ? '#fbbf24' : '#e2e8f0') + ';">' + i.current_stock.toFixed(1) + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            const allDist = [...baniDist.map(d => ({...d, branch: 'bani'})), ...alexDist.map(d => ({...d, branch: 'alex'}))];
+            if (allDist.length) {
+                html += '<div style="font-size:0.65rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:2px;border-bottom:1px solid #1e293b;margin:6px 0 4px 0;">' + t('distByStation') + '</div>';
+                const stationTotals = {};
+                allDist.forEach(d => { stationTotals[d.station] = (stationTotals[d.station] || 0) + d.total; });
+                const sorted = Object.entries(stationTotals).sort((a, b) => b[1] - a[1]);
+                html += '<table style="width:100%;border-collapse:collapse;">' +
+                    '<thead><tr style="color:#64748b;font-size:0.55rem;"><th style="text-align:left;padding:1px 2px;">' + t('items') + '</th>' +
+                    '<th style="text-align:right;padding:1px 2px;">' + t('weight') + '</th></tr></thead><tbody>';
+                sorted.forEach(([station, total]) => {
+                    html += '<tr style="border-bottom:1px solid #0f172a;">' +
+                        '<td style="text-align:left;padding:2px 2px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;" title="' + esc(station) + '">' + esc(station) + '</td>' +
+                        '<td style="text-align:right;padding:2px 2px;font-weight:700;color:#a78bfa;">' + total.toFixed(1) + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            if (!allItems.length && !allDist.length) {
+                html += '<div style="color:#475569;text-align:center;padding:8px;">' + t('allNormal') + '</div>';
+            }
+            el.innerHTML = html;
+        }
+
+        async function fetchReportPanel() {
+            try {
+                const res = await fetch('/api/control-room-report');
+                const data = await res.json();
+                renderReportPanel(data);
+            } catch {}
         }
 
         function startMonitor() {
@@ -338,7 +727,25 @@
             updateClock();
             setInterval(updateClock, 1000);
             fetchDashboard();
-            setInterval(fetchDashboard, 10000);
+            setInterval(fetchDashboard, 15000);
+            fetchReportPanel();
+            setInterval(fetchReportPanel, 60000);
+            // Ticker hover pause — pause on hover, resume after 10s
+            const tickerEl = document.getElementById('activity-ticker');
+            const feedEl = tickerEl?.parentElement;
+            if (feedEl) {
+                let hoverTimer = null;
+                feedEl.addEventListener('mouseenter', () => {
+                    tickerEl.style.animationPlayState = 'paused';
+                    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+                });
+                feedEl.addEventListener('mouseleave', () => {
+                    if (hoverTimer) clearTimeout(hoverTimer);
+                    hoverTimer = setTimeout(() => {
+                        tickerEl.style.animationPlayState = 'running';
+                    }, 10000);
+                });
+            }
             playChime();
         }
 
