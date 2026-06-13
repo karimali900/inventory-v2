@@ -185,14 +185,30 @@ SMTP_PASS = os.environ.get("SMTP_PASS", "")
 ALERT_EMAILS = os.environ.get("ALERT_EMAILS", "").split(",") if os.environ.get("ALERT_EMAILS") else []
 WEBHOOK_URLS = [u.strip() for u in os.environ.get("WEBHOOK_URL", "").split(",") if u.strip()]
 
-def send_email(subject: str, body: str, html_body: str = "", to_emails: list = None) -> str:
+def send_email(subject: str, body: str, html_body: str = "", to_emails: list = None, attach_files: list = None) -> str:
     recipients = to_emails if to_emails is not None else ALERT_EMAILS
     if not SMTP_PASS:
         return "SMTP password not configured (set SMTP_PASS)"
     if not recipients:
         return "No recipients configured"
     try:
-        msg = MIMEText(html_body, "html") if html_body else MIMEText(body)
+        if attach_files:
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.base import MIMEBase
+            from email import encoders
+            msg = MIMEMultipart()
+            msg.attach(MIMEText(html_body or body, "html" if html_body else "plain"))
+            for fpath in attach_files:
+                p = Path(fpath)
+                if p.exists():
+                    with open(p, "rb") as fp:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(fp.read())
+                    encoders.encode_base64(part)
+                    part.add_header("Content-Disposition", f'attachment; filename="{p.name}"')
+                    msg.attach(part)
+        else:
+            msg = MIMEText(html_body, "html") if html_body else MIMEText(body)
         msg["Subject"] = subject
         msg["From"] = SMTP_USER
         msg["To"] = ", ".join(recipients)
@@ -1251,10 +1267,9 @@ class InventoryBranch:
         }
 
     async def send_ostool_email(self, body: dict = {}):
-        station_filter = body.get("station", "").strip()
-        general_note = body.get("general_note", "").strip()
+        email_body = body.get("email_body", "").strip()
         date = body.get("date", "").strip()
-        transport_info = body.get("transport_info", "")
+        include_attach = body.get("include_attach", False)
         conn = self.db()
         where = self._ostool_where()
         params = []
@@ -1263,9 +1278,6 @@ class InventoryBranch:
             date = dt_date.today().isoformat()
         where += " AND DATE(d.created_at) = ?"
         params.append(date)
-        if station_filter:
-            where += " AND d.station = ?"
-            params.append(station_filter)
         rows = conn.execute(
             f"""SELECT d.*, i.name as item_name
                 FROM distributions d
@@ -1283,8 +1295,14 @@ class InventoryBranch:
         grand_total_ops = conn.execute(
             f"SELECT COUNT(*) as c FROM distributions d WHERE {where}", params
         ).fetchone()["c"]
+        attach_files = []
+        if include_attach:
+            att_rows = conn.execute("SELECT filename FROM ostool_attachments WHERE ostool_date=?", (date,)).fetchall()
+            for r in att_rows:
+                fp = UPLOAD_DIR / r["filename"]
+                if fp.exists():
+                    attach_files.append(str(fp))
         conn.close()
-        station_label = f" - {station_filter}" if station_filter else ""
         ops_rows = ""
         for r in rows:
             driver = r["driver_name"] or "—"
@@ -1300,23 +1318,21 @@ class InventoryBranch:
                 <td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;color:#64748b">{remark}</td>
                 <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;color:#64748b;font-size:11px">{r['created_at'][:10] if r['created_at'] else '—'}</td>
             </tr>"""
+        email_body_html = f"""<div style="padding:8px 16px;background:#fefce8;border-bottom:1px solid #fde68a;font-size:13px;color:#92400e;line-height:1.6;">
+          {email_body}</div>""" if email_body else ""
         html = f"""<!DOCTYPE html>
 <html dir="ltr"><head><meta charset="utf-8"></head>
 <body style="font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;margin:0">
 <div style="max-width:900px;margin:auto">
   <div style="background:linear-gradient(135deg,#92400e,#d97706);color:white;padding:20px;border-radius:12px 12px 0 0;text-align:center">
-    <h1 style="margin:0;font-size:20px">🚛 Ostool Operations Report{station_label} / تقرير تشغيل الاسطول{station_label}</h1>
+    <h1 style="margin:0;font-size:20px">🚛 Ostool Operations Report / تقرير تشغيل الاسطول</h1>
   </div>
     <div style="background:white;border-radius:0 0 12px 12px;overflow:hidden;border:1px solid #e2e8f0;padding:4px">
         <div style="display:flex;justify-content:space-between;padding:12px 16px;background:#fef3c7;border-bottom:1px solid #fde68a;font-size:13px;font-weight:bold">
           <span>Total Ops / إجمالي العمليات: {grand_total_ops}</span>
           <span>Total Weight / إجمالي الوزن: {grand_total_weight:.2f} t</span>
         </div>"""
-        general_note_html = f"""<div style="padding:8px 16px;background:#fefce8;border-bottom:1px solid #fde68a;font-size:12px;color:#92400e">
-          <strong>ملاحظات:</strong> {general_note}</div>""" if general_note else ""
-        transport_html = f"""<div style="padding:8px 16px;background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:12px;color:#166534">
-          <strong>🚚 النقل مشمول:</strong> {transport_info}</div>""" if transport_info else ""
-        html += f"""{general_note_html}{transport_html}
+        html += f"""{email_body_html}
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#92400e;color:white">
         <th style="padding:8px;text-align:left">الشركة الناقلة</th>
@@ -1333,16 +1349,16 @@ class InventoryBranch:
   </div>
   <p style="color:#94a3b8;font-size:11px;margin-top:12px;text-align:center;border-top:1px solid #e2e8f0;padding-top:12px;color:#1e293b;font-weight:bold;font-size:13px">created by @KARIM — نظام إدارة المخزون</p>
 </div></body></html>"""
-        subject = f"🚛 Ostool Operations Report{station_label} / تقرير تشغيل الاسطول{station_label}"
+        subject = f"🚛 Ostool Operations Report / تقرير تشغيل الاسطول — {date}"
         custom_emails = body.get("to_emails", "")
         if custom_emails:
             to_emails = [e.strip() for e in custom_emails.split(",") if e.strip()]
         else:
             to_emails = ALERT_EMAILS if ALERT_EMAILS else ["dtitan@ostool-eg.com"]
-        err = send_email(subject, "Ostool Operations Report", html, to_emails=to_emails)
+        err = send_email(subject, "Ostool Operations Report", html, to_emails=to_emails, attach_files=attach_files)
         if err:
             return {"ok": False, "error": err}
-        return {"ok": True, "sent_to": to_emails}
+        return {"ok": True, "sent_to": to_emails, "attachments": len(attach_files)}
 
     # ─── Ostool Attachments ───
     async def list_ostool_attachments(self, date: str = ""):

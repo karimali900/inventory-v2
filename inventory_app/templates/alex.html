@@ -369,19 +369,25 @@
 
         <div id="tab-ostool-content" class="hidden">
             <div class="flex flex-wrap gap-2 mb-4 items-center">
-                <select id="ostool-station-filter" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm">
-                    <option value="" data-i18n="allStations">All Stations</option>
-                </select>
-                <input id="ostool-date" type="date" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                <input id="ostool-date" type="date" onchange="loadOstoolOps();loadOstoolAttachments()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
                 <input id="ostool-emails" list="ostool-email-list" autocomplete="email" placeholder="dtitan@ostool-eg.com" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-emerald-500" onchange="localStorage.setItem('ostool_emails', this.value)">
                 <datalist id="ostool-email-list"></datalist>
-                <button onclick="sendOstoolEmail()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="ostoolEmail">📧 Email to Ostool</button>
+                <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
+                    <input type="checkbox" id="ostool-include-attach" checked style="accent-color:#a78bfa;">
+                    <span data-i18n="includeAttach">📎 Attach</span>
+                </label>
+                <button onclick="sendOstoolEmail()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="ostoolEmail">📧 Send</button>
                 <button onclick="printOstool()" id="print-ostool-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="printOstool">🖨️ Print</button>
             </div>
             <div class="flex flex-wrap gap-2 mb-4 items-start">
-                <textarea id="ostool-general-note" rows="2" placeholder="ملاحظات عامة للإيميل..." class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-rose-500 resize-none text-xs" oninput="localStorage.setItem('ostool_general_note', this.value)"></textarea>
-                <button onclick="document.getElementById('ostool-general-note').value='';localStorage.removeItem('ostool_general_note')" class="bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded text-xs font-bold transition self-end" data-i18n="delete">🗑️ Delete</button>
+                <textarea id="ostool-email-body" rows="3" placeholder="Write email body..." class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-rose-500 resize-none text-xs"></textarea>
             </div>
+            <div class="flex flex-wrap gap-2 mb-4 items-center">
+                <input id="ostool-attachment" type="file" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm text-xs file:bg-amber-600 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:mr-2 file:cursor-pointer file:hover:bg-amber-500">
+                <button onclick="uploadOstoolAttachment()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="uploadFile">📎 Upload</button>
+                <button onclick="checkOstoolEmail()" class="bg-sky-700 hover:bg-sky-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="checkEmail">📩 Check Email</button>
+            </div>
+            <div id="ostool-attachments-list" class="flex flex-wrap gap-2 mb-4 text-xs"></div>
             <div class="glass rounded-xl p-4 border border-slate-600">
                 <div id="ostool-content" class="text-xs text-slate-400">Loading...</div>
             </div>
@@ -898,8 +904,16 @@
                 lastOp: 'آخر عملية',
                 noOstool: 'لا توجد عمليات اسطول بعد.',
                 ostoolEmailSent: 'تم إرسال تقرير الاسطول عبر الإيميل',
-                allStations: 'جميع المحطات',
+                includeAttach: '📎 المرفقات',
                 sending: 'جارٍ الإرسال',
+                uploadFile: '📎 رفع ملف',
+                checkEmail: '📩 فحص البريد',
+                checking: 'جارٍ الفحص',
+                emailsFound: 'رسائل جديدة وُجدت',
+                from: 'من',
+                attachments: 'المرفقات',
+                noNewEmails: 'لا توجد رسائل جديدة',
+                uploadedOk: 'تم رفع الملف بنجاح',
                 searchFiles: '📁 بحث داخلي',
                 searchMaps: '🗺️ خرائط جوجل',
                 searchApp: '🔎 بحث في النظام',
@@ -1124,8 +1138,16 @@
                 lastOp: 'Last Operation',
                 noOstool: 'No Ostool operations found.',
                 ostoolEmailSent: 'Ostool report sent via email',
-                allStations: 'All Stations',
+                includeAttach: '📎 Attach',
                 sending: 'Sending...',
+                uploadFile: '📎 Upload',
+                checkEmail: '📩 Check Email',
+                checking: 'Checking...',
+                emailsFound: 'New emails found',
+                from: 'From',
+                attachments: 'Attachments',
+                noNewEmails: 'No new emails found',
+                uploadedOk: 'File uploaded successfully',
                 searchFiles: '📁 Internal Search',
                 searchMaps: '🗺️ Google Maps',
                 searchApp: '🔎 Search App',
@@ -1296,6 +1318,7 @@
                 ost.classList.remove('hidden');
                 btnOst.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
                 loadOstoolOps();
+                loadOstoolAttachments();
             } else if (tab === 'users') {
                 usr.classList.remove('hidden');
                 btnUsr.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
@@ -3051,28 +3074,11 @@
 
         async function loadOstoolOps() {
             const el = document.getElementById('ostool-content');
-            const sel = document.getElementById('ostool-station-filter');
             try {
-                const station = sel ? sel.value : '';
                 const date = document.getElementById('ostool-date')?.value || '';
-                let url = '/api/inventory/ostool-operations?';
-                const params = [];
-                if (station) params.push('station=' + encodeURIComponent(station));
-                if (date) params.push('date=' + encodeURIComponent(date));
-                url += params.join('&');
+                const url = date ? '/api/inventory/ostool-operations?date=' + encodeURIComponent(date) : '/api/inventory/ostool-operations';
                 const res = await fetch(url);
                 const data = await res.json();
-                if (sel) {
-                    const current = sel.value;
-                    sel.innerHTML = '<option value="">' + t('allStations') + '</option>';
-                    (data.stations || []).forEach(s => {
-                        const opt = document.createElement('option');
-                        opt.value = s;
-                        opt.textContent = s;
-                        if (s === current) opt.selected = true;
-                        sel.appendChild(opt);
-                    });
-                }
                 if (!data.companies.length) {
                     el.innerHTML = '<p class="text-slate-500 text-center py-8">' + t('noOstool') + '</p>';
                     return;
@@ -3123,20 +3129,15 @@
             const orig = btn.textContent;
             btn.textContent = t('sending') + '...';
             btn.disabled = true;
-            const station = document.getElementById('ostool-station-filter')?.value || '';
             const date = document.getElementById('ostool-date')?.value || '';
             const to_emails = document.getElementById('ostool-emails')?.value.trim() || '';
-            const general_note = document.getElementById('ostool-general-note')?.value.trim() || '';
-            const transportKey = 'acc_transport_' + date;
-            let transportData = {};
-            try { transportData = JSON.parse(localStorage.getItem(transportKey) || '{}'); } catch {}
-            const checkedStations = Object.keys(transportData).filter(k => transportData[k]);
-            const transportInfo = checkedStations.length ? '🚚 Stations with transport included: ' + checkedStations.join(', ') : '';
+            const email_body = document.getElementById('ostool-email-body')?.value.trim() || '';
+            const include_attach = document.getElementById('ostool-include-attach')?.checked || false;
             try {
                 const res = await fetch('/api/inventory/ostool-operations/email', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ station, date, general_note, to_emails, transport_info: transportInfo })
+                    body: JSON.stringify({ date, email_body, to_emails, include_attach })
                 });
                 const data = await res.json();
                 if (data.ok) {
@@ -3174,6 +3175,84 @@
             `);
             printWindow.document.close();
             setTimeout(() => printWindow.print(), 500);
+        }
+
+        // ─── Ostool Attachments ───
+        async function loadOstoolAttachments() {
+            const date = document.getElementById('ostool-date')?.value || '';
+            const el = document.getElementById('ostool-attachments-list');
+            try {
+                const res = await fetch('/api/inventory/ostool-attachments?date=' + encodeURIComponent(date));
+                const data = await res.json();
+                if (!data.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+                el.style.display = 'flex';
+                el.innerHTML = data.map(a =>
+                    '<div class="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 flex items-center gap-2">' +
+                    '<span class="text-amber-400 text-xs">📎</span>' +
+                    '<a href="' + a.url + '" target="_blank" class="text-sky-400 hover:text-sky-300 text-xs underline truncate max-w-[180px]" title="' + esc(a.original_name) + '">' + esc(a.original_name) + '</a>' +
+                    '<span class="text-slate-600 text-[10px]">(' + (a.file_size ? (a.file_size / 1024).toFixed(1) + 'KB' : '') + ')</span>' +
+                    '<button onclick="deleteOstoolAttachment(' + a.id + ')" class="text-red-400 hover:text-red-300 text-xs ml-1">✕</button>' +
+                    '</div>'
+                ).join('');
+            } catch { el.style.display = 'none'; }
+        }
+
+        async function uploadOstoolAttachment() {
+            const input = document.getElementById('ostool-attachment');
+            const file = input.files?.[0];
+            if (!file) { toast(t('error')); return; }
+            const date = document.getElementById('ostool-date')?.value || '';
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('ostool_date', date);
+            try {
+                const res = await fetch('/api/inventory/ostool-attachments', { method: 'POST', body: fd });
+                if (res.ok) {
+                    input.value = '';
+                    loadOstoolAttachments();
+                    toast(t('uploadedOk'));
+                } else { toast(t('error')); }
+            } catch { toast(t('error')); }
+        }
+
+        async function deleteOstoolAttachment(id) {
+            try {
+                await fetch('/api/inventory/ostool-attachments/' + id, { method: 'DELETE' });
+                loadOstoolAttachments();
+            } catch { toast(t('error')); }
+        }
+
+        async function checkOstoolEmail() {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = t('checking') + '...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/check-email', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (data.ok && data.count > 0) {
+                    let msg = t('emailsFound') + ': ' + data.count + '\n';
+                    data.emails.forEach(e => {
+                        msg += '\n📧 ' + e.subject + '\n   ' + t('from') + ': ' + e.from;
+                        if (e.attachments.length) {
+                            msg += '\n   📎 ' + t('attachments') + ':';
+                            e.attachments.forEach(a => msg += '\n      - ' + a.original + ' (' + a.url + ')');
+                        }
+                    });
+                    alert(msg);
+                    if (data.emails.some(e => e.attachments.length)) loadOstoolAttachments();
+                } else if (data.ok) {
+                    alert(t('noNewEmails'));
+                } else {
+                    alert(t('error') + ': ' + (data.error || ''));
+                }
+            } catch { alert(t('error')); }
+            btn.textContent = orig;
+            btn.disabled = false;
         }
 
         // ─── Activity Log ───
@@ -3294,9 +3373,6 @@
         const prev = localStorage.getItem('ostool_emails');
         const ei = document.getElementById('ostool-emails');
         if (ei && prev) ei.value = prev;
-        const prevNote = localStorage.getItem('ostool_general_note');
-        const gn = document.getElementById('ostool-general-note');
-        if (gn && prevNote) gn.value = prevNote;
         fetch('/api/inventory/recipients').then(r => r.json()).then(rows => {
             const dl = document.getElementById('ostool-email-list');
             if (dl) {
