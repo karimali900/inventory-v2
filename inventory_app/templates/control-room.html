@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#020617">
-    <title>🚀 Control Room</title>
+    <title>🚀 Monitoring Room</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -16,7 +16,7 @@
         .stat-box { background: rgba(15,23,42,0.8); border: 1px solid #334155; border-radius: 12px; padding: 16px 24px; }
         .dash-header { width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .stats-row { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .stats-row-2 { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .stats-row-2 { width: 100%; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
         .chart-wrap { width: 100%; background: rgba(15,23,42,0.6); border: 1px solid #1e293b; border-radius: 12px; padding: 8px; position: relative; overflow: hidden; }
         .bottom-row { width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
         #clock { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: bold; color: #fbbf24; letter-spacing: 0.08em; }
@@ -32,13 +32,14 @@
         .toast { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; background: rgba(220,38,38,0.9); border: 1px solid #f87171; color: #fff; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes ticker-scroll { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        #activity-ticker { animation: ticker-scroll 30s linear infinite; }
+        #activity-ticker { color:#f1f5f9;font-size:0.85rem;overflow:hidden;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,0.6); }
+        #activity-ticker.animate { animation: ticker-scroll 30s linear infinite; }
         ::-webkit-scrollbar { width: 0; }
         .rtl { direction: rtl; }
         @media (max-width: 768px) {
             .dash-layout { padding: 12px; gap: 10px; }
             .stats-row { grid-template-columns: repeat(2, 1fr); }
-            .stats-row-2 { grid-template-columns: repeat(2, 1fr); }
+            .stats-row-2 { grid-template-columns: repeat(3, 1fr); }
             .bottom-row { grid-template-columns: 1fr; }
             .bottom-row { grid-template-columns: 1fr; }
             .stat-box { padding: 10px 14px; }
@@ -49,7 +50,7 @@
     <div class="dash-layout">
         <div class="dash-header">
             <div>
-                <div class="text-amber-400 font-bold uppercase tracking-widest section-title" id="dash-title">🚀 Control Room</div>
+                <div class="text-amber-400 font-bold uppercase tracking-widest section-title" id="dash-title">🚀 Monitoring Room</div>
                 <div id="clock" class="mt-1"></div>
             </div>
             <div class="flex items-center gap-3" style="font-size:0.8rem;color:#94a3b8;">
@@ -65,25 +66,30 @@
         </div>
 
         <div class="stats-row">
-            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-total">Net Stock (ton)</div><div class="stat-value text-amber-400" id="stat-total">0</div></div>
-            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-bani">Bani (ton)</div><div class="stat-value text-amber-400" id="stat-bani">0</div></div>
-            <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-alex">Alex (ton)</div><div class="stat-value text-sky-400" id="stat-alex">0</div></div>
+            <div class="stat-box text-center" id="tip-total"><div class="stat-label text-slate-400 uppercase" id="label-total">Net Stock (ton)</div><div class="stat-value text-amber-400" id="stat-total">0</div></div>
+            <div class="stat-box text-center" id="tip-bani"><div class="stat-label text-slate-400 uppercase" id="label-bani">Bani (ton)</div><div class="stat-value text-amber-400" id="stat-bani">0</div></div>
+            <div class="stat-box text-center" id="tip-alex"><div class="stat-label text-slate-400 uppercase" id="label-alex">Alex (ton)</div><div class="stat-value text-sky-400" id="stat-alex">0</div></div>
         </div>
         <div class="stats-row-2">
             <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-items">Items</div><div class="stat-value text-white" id="stat-items">0</div></div>
             <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-alerts">Alerts</div><div class="stat-value" id="stat-alerts">0</div></div>
+            <div class="stat-box text-center" id="tip-orders"><div class="stat-label text-slate-400 uppercase" id="label-orders">Orders</div><div class="stat-value text-cyan-400" id="stat-orders">0✓ / 0✗</div></div>
             <div class="stat-box text-center"><div class="stat-label text-slate-400 uppercase" id="label-online">Online</div><div class="stat-value text-emerald-400" id="stat-users">0</div></div>
+            <div class="stat-box text-center" id="tip-wd-value"><div class="stat-label text-slate-400 uppercase" id="label-wd-value">Weight Diffs Value</div><div class="stat-value text-rose-400" id="stat-wd-value">0</div><div class="text-[0.5rem] text-slate-600 mt-0.5" id="wd-value-ts"></div></div>
+            <div class="stat-box text-center" id="tip-wd-qty"><div class="stat-label text-slate-400 uppercase" id="label-wd-qty">Weight Diffs (ton)</div><div class="stat-value text-rose-400" id="stat-wd-qty">0</div></div>
         </div>
 
-        <div class="chart-wrap" style="max-height:200px;display:flex;gap:10px;align-items:stretch;">
+        <div class="chart-wrap" style="max-height:260px;display:flex;gap:10px;align-items:stretch;">
             <div id="chart-summary" style="flex-shrink:0;width:110px;overflow-y:auto;font-size:0.6rem;color:#94a3b8;border-right:1px solid #1e293b;padding-right:6px;display:flex;flex-direction:column;gap:3px;"></div>
-            <canvas id="stockChart" height="160" style="flex:1;"></canvas>
+            <div style="flex:1;overflow:hidden;min-width:0;"><canvas id="stockChart" height="160" style="width:100%;height:100%;"></canvas></div>
         </div>
 
         <div class="bottom-row">
             <div class="flex flex-col gap-2">
                 <div class="section-title font-bold text-rose-400 uppercase tracking-wider" id="alerts-heading">🚨 Alerts</div>
                 <div id="alerts-list" class="flex flex-col gap-2 overflow-y-auto" style="max-height:200px;"></div>
+                <div class="section-title font-bold text-emerald-400 uppercase tracking-wider text-[0.6rem] mt-1" id="stockLevels-heading">📊 مستويات المخزون</div>
+                <div style="overflow:hidden;max-height:140px;"><canvas id="stockLevelsChart" height="100" style="width:100%;"></canvas></div>
             </div>
             <div class="flex flex-col gap-2">
                 <div class="section-title font-bold text-sky-400 uppercase tracking-wider" id="overview-heading">📊 Overview</div>
@@ -95,10 +101,13 @@
             </div>
         </div>
 
-        <div id="activity-feed" style="width:100%;max-width:1400px;background:linear-gradient(135deg,rgba(2,6,23,0.95),rgba(15,23,42,0.85));border:1px solid #0f172a;border-radius:10px;padding:10px 14px;overflow:hidden;white-space:nowrap;box-shadow:0 4px 32px rgba(0,0,0,0.5);">
-            <div style="display:flex;align-items:center;gap:10px;">
+        <div id="activity-feed" style="width:100%;max-width:1400px;background:linear-gradient(135deg,rgba(2,6,23,0.95),rgba(15,23,42,0.85));border:1px solid #0f172a;border-radius:10px;padding:10px 14px;overflow:hidden;box-shadow:0 4px 32px rgba(0,0,0,0.5);">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
                 <span style="color:#fbbf24;font-weight:bold;font-size:0.7rem;flex-shrink:0;background:rgba(251,191,36,0.08);padding:2px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.15);letter-spacing:0.05em;" id="live-label">🔴 LIVE</span>
-                <div id="activity-ticker" style="color:#f1f5f9;font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 6px rgba(0,0,0,0.6);"></div>
+                <div id="activity-ticker" style="color:#f1f5f9;font-size:0.85rem;overflow:hidden;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,0.6);"></div>
+            </div>
+            <div id="live-bar-progress" style="width:100%;height:4px;background:#1e293b;border-radius:2px;overflow:hidden;">
+                <div id="live-bar-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#fbbf24,#f59e0b);border-radius:2px;transition:width 0.3s linear;"></div>
             </div>
         </div>
     </div>
@@ -111,6 +120,7 @@
         let prevAlerts = [];
         let audioCtx = null;
         let chartInstance = null;
+        let stockLevelChart = null;
         let lastData = null;
         let lastDataHash = '';
         let lastChartBuild = 0;
@@ -118,9 +128,10 @@
 
         const i18n = {
             en: {
-                title: '🚀 Control Room',
+                title: '🚀 Monitoring Room',
                 clock: '🕐', back: '← Back', langBtn: 'عربي',
-                netStock: 'Net Stock (ton)', baniStock: 'Bani (ton)', alexStock: 'Alex (ton)', items: 'Items', alerts: 'Alerts', online: 'Online',
+                netStock: 'Net Stock (ton)', baniStock: 'Bani (ton)', alexStock: 'Alex (ton)', items: 'Items', alerts: 'Alerts', orders: 'Orders', done: '✓ Done', pending: '⏳ Pend', online: 'Online',
+                wdValue: 'Weight Diffs Value', wdQty: 'Weight Diffs (ton)',
                 alertsTitle: '🚨 Alerts', overview: '📊 Overview',
                 stockLevels: '📋 Stock Levels',
                 distByStation: 'Distributions by Station',
@@ -135,11 +146,14 @@
                 liveLabel: '🔴 LIVE',
                 baniLabel: 'Bani Sweif',
                 alexLabel: 'Alexandria',
+                distributions: 'Distributions',
+                trucks: 'Trucks',
             },
             ar: {
-                title: '🚀 غرفة التحكم',
+                title: '🚀 غرفة العرض و التتبع',
                 clock: '🕐', back: '← رجوع', langBtn: 'English',
-                netStock: 'صافى المخزون (طن)', baniStock: 'بنى سويف (طن)', alexStock: 'الإسكندرية (طن)', items: 'الأصناف', alerts: 'إنذارات', online: 'متصلين',
+                netStock: 'صافى المخزون (طن)', baniStock: 'بنى سويف (طن)', alexStock: 'الإسكندرية (طن)', items: 'الأصناف', alerts: 'إنذارات', orders: 'الطلبات', done: '✓ تم', pending: '⏳ معلق', online: 'متصلين',
+                wdValue: 'قيمة فروق الوزن', wdQty: 'فروق الوزن (طن)',
                 alertsTitle: '🚨 إنذارات', overview: '📊 نظرة عامة', vehiclesTitle: '🚛 سيارات الاسطول',
                 stockLevels: '📋 مستويات المخزون',
                 distByStation: 'التوزيعات حسب المحطة',
@@ -154,6 +168,8 @@
                 liveLabel: '🔴 مباشر',
                 baniLabel: 'بنى سويف',
                 alexLabel: 'الإسكندرية',
+                distributions: 'التوزيعات',
+                trucks: 'الشاحنات',
             }
         };
 
@@ -168,6 +184,9 @@
             document.getElementById('label-alex').textContent = t('alexStock');
             document.getElementById('label-items').textContent = t('items');
             document.getElementById('label-alerts').textContent = t('alerts');
+            document.getElementById('label-orders').textContent = t('orders');
+            document.getElementById('label-wd-value').textContent = t('wdValue');
+            document.getElementById('label-wd-qty').textContent = t('wdQty');
             document.getElementById('label-online').textContent = t('online');
             document.getElementById('alerts-heading').textContent = t('alertsTitle');
             document.getElementById('overview-heading').textContent = t('overview');
@@ -312,6 +331,13 @@
                     ).join('، ');
                     parts.push('آخر الإيداعات: ' + depTexts);
                 }
+                // Fleet status
+                const baniFleet = data.bani?.fleet_status || [];
+                const alexFleet = data.alex?.fleet_status || [];
+                const baniFleetParts = baniFleet.map(f => f.category + ' ' + f.count).join('، ');
+                const alexFleetParts = alexFleet.map(f => f.category + ' ' + f.count).join('، ');
+                if (baniFleetParts) parts.push('أسطول بنى سويف: ' + baniFleetParts);
+                if (alexFleetParts) parts.push('أسطول الإسكندرية: ' + alexFleetParts);
             } else {
                 // Stock summary for Bani
                 if (baniItems.length) {
@@ -337,6 +363,13 @@
                     ).join(', ');
                     parts.push('Latest transfers: ' + depTexts);
                 }
+                // Fleet status
+                const baniFleet = data.bani?.fleet_status || [];
+                const alexFleet = data.alex?.fleet_status || [];
+                const baniFleetParts = baniFleet.map(f => f.category + ' ' + f.count).join(', ');
+                const alexFleetParts = alexFleet.map(f => f.category + ' ' + f.count).join(', ');
+                if (baniFleetParts) parts.push('Bani fleet: ' + baniFleetParts);
+                if (alexFleetParts) parts.push('Alex fleet: ' + alexFleetParts);
             }
             return parts.join('. ') + '.';
         }
@@ -406,17 +439,54 @@
             return COLOR_PALETTE[idx];
         }
 
+        function renderStockLevelsChart(data) {
+            const items = [...(data.bani?.items || []), ...(data.alex?.items || [])];
+            const canvas = document.getElementById('stockLevelsChart');
+            if (!canvas || !items.length) return;
+            const parent = canvas.parentElement;
+            canvas.height = Math.min(100, 20 + items.length * 18);
+            const combined = {};
+            items.forEach(i => {
+                if (!combined[i.name]) combined[i.name] = { stock: 0, threshold: 0 };
+                combined[i.name].stock += i.current_stock;
+                combined[i.name].threshold += i.warning_threshold;
+            });
+            const sorted = Object.entries(combined).sort((a, b) => b[1].stock - a[1].stock);
+            const labels = sorted.map(([k]) => k.length > 10 ? k.slice(0, 9) + '…' : k);
+            const stocks = sorted.map(([, v]) => +v.stock.toFixed(1));
+            const colors = labels.map(n => {
+                let h = 0;
+                for (let i = 0; i < n.length; i++) h = ((h << 5) - h) + n.charCodeAt(i);
+                const hue = Math.abs(h) % 360;
+                return 'hsl(' + hue + ', 70%, 50%)';
+            });
+            const ctx = canvas.getContext('2d');
+            if (stockLevelChart) { stockLevelChart.destroy(); stockLevelChart = null; }
+            stockLevelChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ data: stocks, backgroundColor: colors, borderRadius: 2, borderSkipped: false, barPercentage: 0.65 }] },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 400 },
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: {
+                        x: { display: false, beginAtZero: true, grid: { display: false } },
+                        y: {
+                            ticks: { color: '#94a3b8', font: { size: 7 }, mirror: true, z: 1 },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
         function buildChart(data) {
             const bani = data.bani?.items || [];
             const alex = data.alex?.items || [];
-            const brLabel = currentLang === 'ar' ? 'بنى' : 'bani';
-            const alLabel = currentLang === 'ar' ? 'اسك' : 'alex';
 
             const baniSorted = [...bani].sort((a, b) => b.current_stock - a.current_stock);
             const alexSorted = [...alex].sort((a, b) => b.current_stock - a.current_stock);
-
-            const baniCount = baniSorted.length;
-            const alexCount = alexSorted.length;
 
             // Build summary panel on left
             const summaryEl = document.getElementById('chart-summary');
@@ -439,8 +509,8 @@
                 '<div style="border-top:1px solid #1e293b;margin-top:auto;padding-top:4px;display:flex;justify-content:space-between;font-weight:700;"><span style="color:#94a3b8;">' + (currentLang === 'ar' ? 'الإجمالى' : 'Total') + '</span><span style="color:#fbbf24;">' + sortedNames.reduce((s, n) => s + combined[n].total, 0).toFixed(1) + '</span></div>';
 
             const allLabels = [
-                ...baniSorted.map(i => i.name + '  [' + brLabel + ']'),
-                ...alexSorted.map(i => i.name + '  [' + alLabel + ']'),
+                ...baniSorted.map(i => t('baniLabel') + ': ' + i.name),
+                ...alexSorted.map(i => t('alexLabel') + ': ' + i.name),
             ];
 
             const allValues = [
@@ -449,12 +519,14 @@
             ];
 
             const allColors = [
-                ...baniSorted.map(i => nameColor(i.name)),
-                ...alexSorted.map(i => nameColor(i.name)),
+                ...baniSorted.map(i => 'hsl(' + (Math.abs(i.name.split('').reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0)) % 360) + ', 70%, 55%)'),
+                ...alexSorted.map(i => 'hsl(' + (Math.abs(i.name.split('').reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0)) % 360) + ', 70%, 40%)'),
             ];
 
             if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
             const canvas = document.getElementById('stockChart');
+            if (!canvas) return;
+            canvas.height = Math.max(100, 30 + allLabels.length * 22);
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             chartInstance = new Chart(ctx, {
@@ -464,98 +536,198 @@
                     datasets: [{
                         data: allValues,
                         backgroundColor: allColors,
-                        borderRadius: 3,
+                        borderRadius: 2,
                         borderSkipped: false,
-                        clip: false,
                         barPercentage: 0.5,
-                        categoryPercentage: 0.95,
+                        categoryPercentage: 0.9,
                     }]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
-                    maintainAspectRatio: true,
-                    layout: {
-                        padding: { left: 10, right: 10 }
-                    },
+                    maintainAspectRatio: false,
                     animation: {
                         duration: 600,
                         easing: 'easeOutQuart',
-                        delay: function(context) {
-                            const i = context.dataIndex;
-                            if (i < baniCount) return i * 40;
-                            return 400 + (i - baniCount) * 40;
-                        }
+                        delay: context => context.dataIndex * 30,
                     },
                     plugins: {
                         legend: { display: false },
                         datalabels: {
-                            display: function(ctx) {
-                                return ctx.dataset.data[ctx.dataIndex] > 0;
-                            },
-                            anchor: 'end',
-                            align: 'end',
-                            offset: -2,
+                            anchor: 'end', align: 'end', offset: 2,
                             color: '#e2e8f0',
-                            font: { size: 7, weight: 'bold' },
+                            font: { size: 8, weight: 'bold' },
                             formatter: v => v.toFixed(1),
+                            display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
                         }
                     },
                     scales: {
                         x: {
-                            offset: true,
-                            ticks: {
-                                color: '#94a3b8',
-                                font: { size: 11, weight: 'bold' },
-                                maxRotation: 30,
-                                minRotation: 0,
-                                autoSkip: true,
-                                maxTicksLimit: 20,
-                            },
+                            display: false,
+                            beginAtZero: true,
                             grid: { display: false }
                         },
-                        y: { beginAtZero: true, ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#1e293b' } }
+                        y: {
+                            ticks: {
+                                color: '#f1f5f9',
+                                font: { size: 9, weight: 'bold' },
+                            },
+                            grid: { display: false }
+                        }
                     }
                 },
                 plugins: [ChartDataLabels]
             });
         }
 
-        function buildTickerContent(data) {
-            const log = data.activity_log || [];
-            const stockParts = [];
+        let _liveBarIndex = 0;
+        let _liveBarTimer = 0;
+        let _liveBarData = null;
+        let _liveBarMode = 'intervals'; // 'intervals' | 'news'
+
+        function buildNewsContent(data) {
+            const parts = [];
+            // Stock summary
             if (data.bani?.items?.length) {
                 const items = data.bani.items.map(i => '<span style="color:' + nameColor(i.name) + ';font-weight:600;">' + esc(i.name) + '</span>=<span style="color:#e2e8f0;font-weight:600;">' + Number(i.current_stock).toFixed(1) + '</span>').join(' <span style="color:#475569;">│</span> ');
-                stockParts.push('<span style="color:#f59e0b;font-weight:600;">' + esc(t('baniLabel')) + '</span> <span style="color:#fbbf24;">»</span> ' + items);
+                parts.push('<span style="color:#f59e0b;font-weight:600;">' + esc(t('baniLabel')) + '</span> <span style="color:#fbbf24;">»</span> ' + items);
             }
             if (data.alex?.items?.length) {
                 const items = data.alex.items.map(i => '<span style="color:' + nameColor(i.name) + ';font-weight:600;">' + esc(i.name) + '</span>=<span style="color:#e2e8f0;font-weight:600;">' + Number(i.current_stock).toFixed(1) + '</span>').join(' <span style="color:#475569;">│</span> ');
-                stockParts.push('<span style="color:#38bdf8;font-weight:600;">' + esc(t('alexLabel')) + '</span> <span style="color:#7dd3fc;">»</span> ' + items);
+                parts.push('<span style="color:#38bdf8;font-weight:600;">' + esc(t('alexLabel')) + '</span> <span style="color:#7dd3fc;">»</span> ' + items);
             }
-            const stockStr = stockParts.length
-                ? '<span style="color:#94a3b8;">📦</span> ' + stockParts.join(' <span style="color:#475569;font-weight:bold;">┃</span> ')
-                : '';
-            // Fleet status segment
+            // Fleet
             const baniFleet = data.bani?.fleet_status || [];
             const alexFleet = data.alex?.fleet_status || [];
             const fleetMap = {};
             baniFleet.forEach(f => { fleetMap['bani_' + f.category] = f.count; });
             alexFleet.forEach(f => { fleetMap['alex_' + f.category] = f.count; });
-            const fleetStr = (baniFleet.length || alexFleet.length)
-                ? '<span style="color:#a78bfa;">🚛</span> <span style="color:#f59e0b;font-weight:600;">' + esc(t('baniLabel')) + '</span> <span style="color:#a78bfa;">Reg ' + (fleetMap['bani_Registered vehicles'] || 0) + ' 🏭 ' + (fleetMap['bani_Inside the factory'] || 0) + ' 🌍 ' + (fleetMap['bani_Outside the factory'] || 0) + '</span> <span style="color:#475569;font-weight:bold;">┃</span> <span style="color:#38bdf8;font-weight:600;">' + esc(t('alexLabel')) + '</span> <span style="color:#a78bfa;">Reg ' + (fleetMap['alex_Registered vehicles'] || 0) + ' 🏭 ' + (fleetMap['alex_Inside the factory'] || 0) + ' 🌍 ' + (fleetMap['alex_Outside the factory'] || 0) + '</span>'
-                : '';
-            const activityStr = log.length
-                ? log.slice().reverse().filter(a => !a.action || !a.action.startsWith('deposit/')).map(a => {
+            if (baniFleet.length || alexFleet.length) {
+                const baniFleetStr = 'Reg ' + (fleetMap['bani_Registered vehicles'] || 0)
+                    + ' 🏭 ' + (fleetMap['bani_Inside the factory'] || 0)
+                    + ' 🌍 ' + (fleetMap['bani_Outside the factory'] || 0)
+                    + ' 🏪 ' + (fleetMap['bani_Inside Station'] || 0)
+                    + ' 🚚 ' + (fleetMap['bani_On the road - Going'] || 0)
+                    + ' 🔙 ' + (fleetMap['bani_On the road - Returning'] || 0)
+                    + ' 🔧 ' + (fleetMap['bani_Maintenance / Breakdown'] || 0);
+                const alexFleetStr = 'Reg ' + (fleetMap['alex_Registered vehicles'] || 0)
+                    + ' 🏭 ' + (fleetMap['alex_Inside the factory'] || 0)
+                    + ' 🌍 ' + (fleetMap['alex_Outside the factory'] || 0)
+                    + ' 🏪 ' + (fleetMap['alex_Inside Station'] || 0)
+                    + ' 🚚 ' + (fleetMap['alex_On the road - Going'] || 0)
+                    + ' 🔙 ' + (fleetMap['alex_On the road - Returning'] || 0)
+                    + ' 🔧 ' + (fleetMap['alex_Maintenance / Breakdown'] || 0);
+                parts.push('<span style="color:#a78bfa;">🚛</span> <span style="color:#f59e0b;">' + esc(t('baniLabel')) + '</span> <span style="color:#a78bfa;">' + baniFleetStr + '</span> <span style="color:#475569;">┃</span> <span style="color:#38bdf8;">' + esc(t('alexLabel')) + '</span> <span style="color:#a78bfa;">' + alexFleetStr + '</span>');
+            }
+            // Orders
+            const baniDone = data.bani?.completed_orders || 0;
+            const baniPend = data.bani?.pending_orders || 0;
+            const alexDone = data.alex?.completed_orders || 0;
+            const alexPend = data.alex?.pending_orders || 0;
+            parts.push('<span style="color:#22c55e;">📋 ' + t('orders') + ':</span> <span style="color:#f59e0b;">' + esc(t('baniLabel')) + '</span> ' + baniDone + '<span style="color:#22c55e;">✓</span>/' + baniPend + '<span style="color:#eab308;">⏳</span> <span style="color:#475569;">┃</span> <span style="color:#38bdf8;">' + esc(t('alexLabel')) + '</span> ' + alexDone + '<span style="color:#22c55e;">✓</span>/' + alexPend + '<span style="color:#eab308;">⏳</span>');
+            // Activity log
+            const log = data.activity_log || [];
+            if (log.length) {
+                const acts = log.slice().reverse().filter(a => !a.action || !a.action.startsWith('deposit/')).slice(0, 5).map(a => {
                     const time = a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '';
                     const branchColor = a.branch === 'bani' ? '#f59e0b' : '#38bdf8';
-                    return '<span style="color:#64748b;">[' + time + ']</span> <span style="color:' + branchColor + ';">' + esc(a.username) + '</span><span style="color:#475569;">@' + esc(a.branch) + '</span>: <span style="color:#e2e8f0;">' + esc(a.action) + '</span>' + (a.details ? ' <span style="color:#94a3b8;">—</span> <span style="color:#cbd5e1;">' + esc(a.details) + '</span>' : '');
-                }).join(' <span style="color:#334155;">│</span> ')
-                : '';
-            const parts = [];
-            if (stockStr) parts.push(stockStr);
-            if (fleetStr) parts.push(fleetStr);
-            if (activityStr) parts.push(activityStr);
-            const bullet = currentLang === 'ar' ? ' ● ' : '  ◆  ';
-            return parts.join('<span style="color:#334155;">' + bullet + bullet + '</span>') || '…';
+                    const det = a.details ? esc(a.details).slice(0, 60) : '';
+                    return '<span style="color:#64748b;">[' + time + ']</span> <span style="color:' + branchColor + ';">' + esc(a.username) + '</span>: <span style="color:#e2e8f0;">' + esc(a.action) + '</span>' + (det ? ' <span style="color:#94a3b8;">—</span> <span style="color:#cbd5e1;">' + det + '</span>' : '');
+                }).join(' <span style="color:#334155;">│</span> ');
+                parts.push('<span style="color:#94a3b8;">📡</span> ' + acts);
+            }
+            return parts.join(' <span style="color:#334155;"> ◆ </span> ') || t('allNormal');
+        }
+
+        function buildLiveBarIntervals(data) {
+            const baniItems = (data.bani?.items || []).map(i => '<span style="color:' + nameColor(i.name) + ';font-weight:600;">' + esc(i.name) + '</span> <span style="color:#e2e8f0;font-weight:700;">' + Number(i.current_stock).toFixed(1) + '</span>').join(' <span style="color:#475569;">│</span> ');
+            const alexItems = (data.alex?.items || []).map(i => '<span style="color:' + nameColor(i.name) + ';font-weight:600;">' + esc(i.name) + '</span> <span style="color:#e2e8f0;font-weight:700;">' + Number(i.current_stock).toFixed(1) + '</span>').join(' <span style="color:#475569;">│</span> ');
+            const baniDistsStations = (data.bani?.completed_stations || []).map(s => '<span style="color:#34d399;">✓</span> ' + esc(s)).join('  ');
+            const alexDistsStations = (data.alex?.completed_stations || []).map(s => '<span style="color:#34d399;">✓</span> ' + esc(s)).join('  ');
+            const baniTrucks = (data.bani?.vehicles || []).length || (data.bani?.fleet_status || []).find(f => f.category === 'Registered vehicles')?.count || 0;
+            const alexTrucks = (data.alex?.vehicles || []).length || (data.alex?.fleet_status || []).find(f => f.category === 'Registered vehicles')?.count || 0;
+            return [
+                { label: t('baniLabel') + ' ' + t('netStock'), value: baniItems || '—', color: '#f59e0b', duration: 11000 },
+                { label: t('baniLabel') + ' ' + t('distributions'), value: baniDistsStations || '—', color: '#f59e0b', duration: 9000 },
+                { label: t('baniLabel') + ' ' + t('trucks'), value: '' + baniTrucks, color: '#f59e0b', duration: 3000 },
+                { label: t('alexLabel') + ' ' + t('netStock'), value: alexItems || '—', color: '#38bdf8', duration: 11000 },
+                { label: t('alexLabel') + ' ' + t('distributions'), value: alexDistsStations || '—', color: '#38bdf8', duration: 9000 },
+                { label: t('alexLabel') + ' ' + t('trucks'), value: '' + alexTrucks, color: '#38bdf8', duration: 3000 },
+            ];
+        }
+
+        function renderLiveBar() {
+            const data = _liveBarData;
+            if (!data) return;
+            const el = document.getElementById('activity-ticker');
+            const fill = document.getElementById('live-bar-fill');
+            if (_liveBarMode === 'news') {
+                const content = buildNewsContent(data);
+                if (el) {
+                    el.innerHTML = content;
+                    el.classList.add('animate');
+                }
+                if (fill) fill.style.width = '100%';
+                return;
+            }
+            const intervals = buildLiveBarIntervals(data);
+            const idx = _liveBarIndex % intervals.length;
+            const seg = intervals[idx];
+            if (el) {
+                el.classList.remove('animate');
+                el.innerHTML = '<span style="color:' + seg.color + ';font-weight:600;">' + seg.label + ':</span> <span style="color:#e2e8f0;font-weight:700;">' + seg.value + '</span>';
+            }
+            if (fill) {
+                const pct = ((idx + _liveBarTimer / seg.duration) / intervals.length) * 100;
+                fill.style.width = Math.min(pct, 100) + '%';
+            }
+        }
+
+        function startLiveBar(data) {
+            _liveBarData = data;
+            if (window._liveBarInterval) return; // already running
+            _liveBarIndex = 0;
+            _liveBarTimer = 0;
+            _liveBarMode = 'intervals';
+            renderLiveBar();
+            const intervals = buildLiveBarIntervals(data);
+            let elapsed = 0;
+            let newsTimer = 0;
+            window._liveBarInterval = setInterval(() => {
+                if (_liveBarMode === 'news') {
+                    newsTimer += 100;
+                    if (newsTimer >= 300000) { // 5 minutes
+                        _liveBarMode = 'intervals';
+                        _liveBarIndex = 0;
+                        _liveBarTimer = 0;
+                        elapsed = 0;
+                        renderLiveBar();
+                    }
+                    return;
+                }
+                const totalDuration = intervals.reduce((s, i) => s + i.duration, 0);
+                elapsed += 100;
+                if (elapsed >= totalDuration) {
+                    // intervals finished → switch to news mode
+                    _liveBarMode = 'news';
+                    newsTimer = 0;
+                    renderLiveBar();
+                    return;
+                }
+                let accum = 0;
+                for (let i = 0; i < intervals.length; i++) {
+                    if (elapsed >= accum && elapsed < accum + intervals[i].duration) {
+                        if (_liveBarIndex !== i) {
+                            _liveBarIndex = i;
+                            _liveBarTimer = 0;
+                        }
+                        _liveBarTimer = elapsed - accum;
+                        break;
+                    }
+                    accum += intervals[i].duration;
+                }
+                renderLiveBar();
+            }, 100);
         }
 
         async function fetchDashboard() {
@@ -586,7 +758,47 @@
             document.getElementById('stat-items').textContent = totalItems;
             document.getElementById('stat-alerts').textContent = allAlerts.length;
             document.getElementById('stat-alerts').className = 'stat-value ' + (allAlerts.length > 0 ? 'text-rose-400' : 'text-emerald-400');
+            const doneOrders = (data.bani?.completed_orders || 0) + (data.alex?.completed_orders || 0);
+            const pendOrders = (data.bani?.pending_orders || 0) + (data.alex?.pending_orders || 0);
+            document.getElementById('stat-orders').innerHTML = '<span style="font-size:0.85em">' + doneOrders + '<span style="color:#22c55e">✓</span> ' + t('done') + ' / ' + pendOrders + '<span style="color:#eab308">⏳</span> ' + t('pending') + '</span>';
+            document.getElementById('stat-orders').style.fontSize = 'inherit';
             document.getElementById('stat-users').textContent = users;
+            const wdVal = (parseFloat(data.bani?.weight_diff_value) || 0) + (parseFloat(data.alex?.weight_diff_value) || 0);
+            const wdQty = (parseFloat(data.bani?.weight_diff_total) || 0) + (parseFloat(data.alex?.weight_diff_total) || 0);
+            document.getElementById('stat-wd-value').textContent = wdVal.toFixed(2);
+            document.getElementById('stat-wd-qty').textContent = wdQty.toFixed(2);
+            const tsEl = document.getElementById('wd-value-ts');
+            if (tsEl) tsEl.textContent = new Date().toLocaleTimeString();
+
+            // Tooltips
+            const elNet = document.getElementById('tip-total');
+            const elBani = document.getElementById('tip-bani');
+            const elAlex = document.getElementById('tip-alex');
+            const elOrd = document.getElementById('tip-orders');
+            const elWdVal = document.getElementById('tip-wd-value');
+            const elWdQty = document.getElementById('tip-wd-qty');
+            const ttipBaniItems = data.bani?.items?.length || 0;
+            const ttipAlexItems = data.alex?.items?.length || 0;
+            const ttipBaniAlerts = data.bani?.alerts?.length || 0;
+            const ttipAlexAlerts = data.alex?.alerts?.length || 0;
+            const ttipBaniDep = (data.bani?.deposits || []).reduce((s,d) => s + d.amount, 0);
+            const ttipAlexDep = (data.alex?.deposits || []).reduce((s,d) => s + d.amount, 0);
+            const ttipBaniFleet = (data.bani?.fleet_status || []).map(f => f.category + ': ' + f.count).join('\n');
+            const ttipAlexFleet = (data.alex?.fleet_status || []).map(f => f.category + ': ' + f.count).join('\n');
+            const ttipBaniDone = data.bani?.completed_orders || 0;
+            const ttipBaniPend = data.bani?.pending_orders || 0;
+            const ttipAlexDone = data.alex?.completed_orders || 0;
+            const ttipAlexPend = data.alex?.pending_orders || 0;
+            const ttipBaniCompSt = (data.bani?.completed_stations || []).join(', ');
+            const ttipBaniPendSt = (data.bani?.pending_stations || []).join(', ');
+            const ttipAlexCompSt = (data.alex?.completed_stations || []).join(', ');
+            const ttipAlexPendSt = (data.alex?.pending_stations || []).join(', ');
+            if (elNet) elNet.title = t('baniLabel') + ': ' + (data.bani?.total_stock || 0).toFixed(1) + ' t\n' + t('alexLabel') + ': ' + (data.alex?.total_stock || 0).toFixed(1) + ' t';
+            if (elBani) elBani.title = t('items') + ': ' + ttipBaniItems + '\n' + t('alerts') + ': ' + ttipBaniAlerts + '\n' + t('deposit') + ': ' + ttipBaniDep.toFixed(2) + '\n🚛 ' + t('fleetStatus') + ':\n' + ttipBaniFleet;
+            if (elAlex) elAlex.title = t('items') + ': ' + ttipAlexItems + '\n' + t('alerts') + ': ' + ttipAlexAlerts + '\n' + t('deposit') + ': ' + ttipAlexDep.toFixed(2) + '\n🚛 ' + t('fleetStatus') + ':\n' + ttipAlexFleet;
+            if (elOrd) elOrd.title = t('baniLabel') + ': ' + ttipBaniDone + t('done') + ' / ' + ttipBaniPend + t('pending') + '\n  ' + (ttipBaniCompSt ? '✓ ' + ttipBaniCompSt : '') + (ttipBaniCompSt && ttipBaniPendSt ? '\n  ' : '') + (ttipBaniPendSt ? '⏳ ' + ttipBaniPendSt : '') + '\n' + t('alexLabel') + ': ' + ttipAlexDone + t('done') + ' / ' + ttipAlexPend + t('pending') + '\n  ' + (ttipAlexCompSt ? '✓ ' + ttipAlexCompSt : '') + (ttipAlexCompSt && ttipAlexPendSt ? '\n  ' : '') + (ttipAlexPendSt ? '⏳ ' + ttipAlexPendSt : '');
+            if (elWdVal) elWdVal.title = t('baniLabel') + ': ' + (parseFloat(data.bani?.weight_diff_value) || 0).toFixed(2) + '\n' + t('alexLabel') + ': ' + (parseFloat(data.alex?.weight_diff_value) || 0).toFixed(2);
+            if (elWdQty) elWdQty.title = t('baniLabel') + ': ' + (parseFloat(data.bani?.weight_diff_total) || 0).toFixed(2) + ' t\n' + t('alexLabel') + ': ' + (parseFloat(data.alex?.weight_diff_total) || 0).toFixed(2) + ' t';
 
             document.getElementById('alerts-list').innerHTML = allAlerts.length
                 ? allAlerts.map(i => {
@@ -629,19 +841,14 @@
             ovEl.innerHTML =
                 '<div class="stat-box" style="padding:10px 14px;"><div style="font-size:0.8rem;color:#94a3b8;">بنى سويف</div><div class="font-bold text-amber-400" style="font-size:clamp(0.9rem,1.8vw,1.3rem);">' + t('items') + ': ' + (data.bani?.items?.length || 0) + ' / ' + t('alerts') + ': ' + baniLow + '</div></div>' +
                 '<div class="stat-box" style="padding:8px 12px;border-color:#065f46;"><div style="font-size:0.75rem;color:#34d399;">💰 ' + t('deposit') + ': ' + baniTotalDep.toFixed(2) + '</div></div>' +
-                '<div class="stat-box" style="padding:8px 12px;border-color:#7c3aed;"><div style="font-size:0.75rem;color:#a78bfa;">🚛 ' + t('fleetStatus') + ': ' + (fleetMap['bani_Registered vehicles'] || 0) + ' / 🏭 ' + (fleetMap['bani_Inside the factory'] || 0) + ' / 🌍 ' + (fleetMap['bani_Outside the factory'] || 0) + '</div></div>' +
+                '<div class="stat-box" style="padding:8px 12px;border-color:#7c3aed;"><div style="font-size:0.75rem;color:#a78bfa;">🚛 ' + t('fleetStatus') + ': ' + (fleetMap['bani_Registered vehicles'] || 0) + ' / 🏭 ' + (fleetMap['bani_Inside the factory'] || 0) + ' / 🌍 ' + (fleetMap['bani_Outside the factory'] || 0) + ' / 🏪 ' + (fleetMap['bani_Inside Station'] || 0) + ' / 🚚 ' + (fleetMap['bani_On the road - Going'] || 0) + ' / 🔙 ' + (fleetMap['bani_On the road - Returning'] || 0) + ' / 🔧 ' + (fleetMap['bani_Maintenance / Breakdown'] || 0) + '</div></div>' +
                 '<div class="stat-box" style="padding:10px 14px;"><div style="font-size:0.8rem;color:#94a3b8;">الإسكندرية</div><div class="font-bold text-amber-400" style="font-size:clamp(0.9rem,1.8vw,1.3rem);">' + t('items') + ': ' + (data.alex?.items?.length || 0) + ' / ' + t('alerts') + ': ' + alexLow + '</div></div>' +
                 '<div class="stat-box" style="padding:8px 12px;border-color:#065f46;"><div style="font-size:0.75rem;color:#34d399;">💰 ' + t('deposit') + ': ' + alexTotalDep.toFixed(2) + '</div></div>' +
-                '<div class="stat-box" style="padding:8px 12px;border-color:#7c3aed;"><div style="font-size:0.75rem;color:#a78bfa;">🚛 ' + t('fleetStatus') + ': ' + (fleetMap['alex_Registered vehicles'] || 0) + ' / 🏭 ' + (fleetMap['alex_Inside the factory'] || 0) + ' / 🌍 ' + (fleetMap['alex_Outside the factory'] || 0) + '</div></div>' +
+                '<div class="stat-box" style="padding:8px 12px;border-color:#7c3aed;"><div style="font-size:0.75rem;color:#a78bfa;">🚛 ' + t('fleetStatus') + ': ' + (fleetMap['alex_Registered vehicles'] || 0) + ' / 🏭 ' + (fleetMap['alex_Inside the factory'] || 0) + ' / 🌍 ' + (fleetMap['alex_Outside the factory'] || 0) + ' / 🏪 ' + (fleetMap['alex_Inside Station'] || 0) + ' / 🚚 ' + (fleetMap['alex_On the road - Going'] || 0) + ' / 🔙 ' + (fleetMap['alex_On the road - Returning'] || 0) + ' / 🔧 ' + (fleetMap['alex_Maintenance / Breakdown'] || 0) + '</div></div>' +
                 '<div class="stat-box" style="padding:10px 14px;"><div style="font-size:0.8rem;color:#94a3b8;">' + t('usersOnline') + '</div><div class="font-bold text-emerald-400" style="font-size:clamp(0.9rem,1.8vw,1.3rem);">' + ((data.active_users || []).map(u => esc(u.username)).join(', ') || t('none')) + '</div></div>';
 
-            // ─── Ticker ───
-            const ticker = document.getElementById('activity-ticker');
-            const content = buildTickerContent(data);
-            ticker.innerHTML = content;
-            ticker.style.animation = 'none';
-            ticker.offsetHeight;
-            ticker.style.animation = 'ticker-scroll 30s linear infinite';
+            // ─── Live Bar ───
+            startLiveBar(data);
 
             document.getElementById('last-updated-monitor').textContent = t('clock') + ' ' + new Date().toLocaleTimeString();
 
@@ -657,6 +864,7 @@
                 lastChartBuild = now;
                 lastDataHash = hash;
                 buildChart(data);
+                renderStockLevelsChart(data);
             }
         }
 
@@ -730,22 +938,6 @@
             setInterval(fetchDashboard, 15000);
             fetchReportPanel();
             setInterval(fetchReportPanel, 60000);
-            // Ticker hover pause — pause on hover, resume after 10s
-            const tickerEl = document.getElementById('activity-ticker');
-            const feedEl = tickerEl?.parentElement;
-            if (feedEl) {
-                let hoverTimer = null;
-                feedEl.addEventListener('mouseenter', () => {
-                    tickerEl.style.animationPlayState = 'paused';
-                    if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
-                });
-                feedEl.addEventListener('mouseleave', () => {
-                    if (hoverTimer) clearTimeout(hoverTimer);
-                    hoverTimer = setTimeout(() => {
-                        tickerEl.style.animationPlayState = 'running';
-                    }, 10000);
-                });
-            }
             playChime();
         }
 

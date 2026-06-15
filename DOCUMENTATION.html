@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+body{font-family:system-ui,sans-serif;max-width:900px;margin:auto;padding:30px;color:#333;line-height:1.6}
+h1{border-bottom:2px solid #2563eb;color:#1e40af;padding-bottom:8px}
+h2{color:#1e40af;margin-top:36px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+h3{color:#334155;margin-top:24px}
+pre{background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px}
+code{background:#e2e8f0;padding:2px 6px;border-radius:3px;font-size:13px}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:12px 0}
+td,th{border:1px solid #cbd5e1;padding:8px 12px;text-align:left}
+th{background:#f1f5f9;font-weight:600}
+tr:nth-child(even){background:#f8fafc}
+br{margin:8px 0}
+ul,ol{padding-left:24px}
+blockquote{border-left:4px solid #2563eb;margin:12px 0;padding:8px 16px;background:#f8fafc;color:#475569}
+</style></head><body>
+<h1>Inventory Management System &mdash; Complete Documentation</h1><h1>Inventory Management System — Complete Documentation</h1><br><p>Version 2.0.0</p><br><p>---</p><br><h2>Table of Contents</h2><br><p>1. [Overview](#1-overview)</p><p>2. [Architecture](#2-architecture)</p><p>3. [Installation](#3-installation)</p><p>4. [Configuration](#4-configuration)</p><p>5. [User Interface](#5-user-interface)</p><p>6. [API Endpoints](#6-api-endpoints)</p><p>7. [Database Schema](#7-database-schema)</p><p>8. [Features](#8-features)</p><p>9. [Troubleshooting](#9-troubleshooting)</p><br><p>---</p><br><h2>1. Overview</h2><br><p>The Inventory Management System is a bilingual (English/Arabic) web application designed for cement inventory tracking across two branches (Bani Suwayf and Alexandria). It manages stock levels, distributions to stations, fleet tracking, customer orders, and provides real-time monitoring dashboards.</p><br><h3>Key Capabilities</h3><br><li>**Inventory Management**: Track stock levels, additions, distributions per item</li>
+<li>**Distribution Management**: Distribute items to stations with voucher tracking</li>
+<li>**Weight Difference Tracking**: Record short-weight deliveries and compute financial values</li>
+<li>**Fleet Management**: Track vehicle fleet status (registered, on-road, maintenance)</li>
+<li>**Customer Orders**: Accept/refuse customer orders with aggregation</li>
+<li>**Real-time Monitoring**: Central Control Room dashboard with live updates</li>
+<li>**Email Reports**: Send daily reports and low-stock alerts via email</li>
+<li>**Webhooks**: Send alerts to external systems</li>
+<li>**Chat & Calling**: Real-time chat with WebRTC audio/video calls</li>
+<li>**GPS Tracking**: Vehicle location tracking on OpenStreetMap</li>
+<li>**Cement News**: Scraped industry news from Google News</li>
+<br><p>---</p><br><h2>2. Architecture</h2><br><h3>Tech Stack</h3><br><li>**Backend**: Python 3.12+, FastAPI (async), Uvicorn</li>
+<li>**Database**: SQLite3 (one database per branch + shared users database)</li>
+<li>**Frontend**: Server-rendered HTML with Tailwind CSS (CDN), Chart.js</li>
+<li>**Authentication**: JWT tokens (python-jose), bcrypt password hashing</li>
+<li>**Real-time**: WebSocket for chat and user presence</li>
+<li>**Email**: SMTP (Gmail app passwords)</li>
+<li>**Deployment**: Heroku-ready (Procfile), Docker-ready</li>
+<br><h3>Directory Structure</h3><br><pre><code>inventory_v2/
+├── inventory_app/
+│   ├── __init__.py          # Main application (routes, auth, email, DB)
+│   ├── __main__.py          # Entry point for `python -m inventory_app`
+│   ├── static/              # Static assets (images, manifest, service worker)
+│   ├── templates/           # HTML templates (5 files)
+│   └── *.db                 # SQLite databases (auto-created)
+├── distances/               # Distance/route data files
+├── scripts/                 # Deployment scripts
+├── uploads/                 # User-uploaded files
+├── run.py                   # Simple launcher
+├── requirements.txt         # Python dependencies
+├── pyproject.toml           # Package configuration
+├── Procfile                 # Heroku process definition
+└── runtime.txt              # Python version for Heroku</code></pre>
+<br><h3>Three-Database Design</h3><br>| Database | Purpose |
+<p>|----------|---------|</p>| `users.db` | Shared user accounts (auth) |
+| `bani.db` | Bani Suwayf branch data |
+| `alex.db` | Alexandria branch data |
+<br><p>This design keeps branches isolated while allowing the Control Room to aggregate across both.</p><br><p>---</p><br><h2>3. Installation</h2><br><h3>Prerequisites</h3><br><li>Python 3.12 or later</li>
+<li>pip (Python package manager)</li>
+<li>Git (for cloning)</li>
+<br><h3>Platform-Specific Instructions</h3><br><p>#### Windows</p><br><pre><code># 1. Install Python from python.org (3.12+)
+# 2. Open PowerShell or Command Prompt
+
+git clone https://github.com/YOUR_USERNAME/inventory-system.git
+cd inventory-system
+
+# 3. Create virtual environment (recommended)
+python -m venv venv
+venv\Scripts\activate
+
+# 4. Install dependencies
+pip install -r requirements.txt
+
+# 5. Configure environment
+copy .env.example .env
+# Edit .env — set JWT_SECRET and ADMIN_PASS at minimum
+
+# 6. Run
+python run.py
+
+# 7. Open http://localhost:8100</code></pre>
+<br><p>#### macOS / Linux</p><br><pre><code># 1. Install Python 3.12+
+# macOS: brew install python@3.12
+# Linux: sudo apt install python3 python3-pip python3-venv
+
+git clone https://github.com/YOUR_USERNAME/inventory-system.git
+cd inventory-system
+
+# 2. Virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. Install
+pip install -r requirements.txt
+
+# 4. Configure
+cp .env.example .env
+nano .env  # Set JWT_SECRET and ADMIN_PASS
+
+# 5. Run
+python run.py
+# Or:
+uvicorn inventory_app:app --host 0.0.0.0 --port 8100</code></pre>
+<br><p>#### Docker</p><br><pre><code># Dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+CMD ["uvicorn", "inventory_app:app", "--host", "0.0.0.0", "--port", "8100"]</code></pre>
+<br><pre><code>docker build -t inventory-system .
+docker run -p 8100:8100 -e JWT_SECRET=your-secret -e ADMIN_PASS=yourpass inventory-system</code></pre>
+<br><p>#### Heroku (Cloud)</p><br><pre><code>heroku create your-app-name
+heroku config:set JWT_SECRET=your-secret ADMIN_PASS=yourpass
+git push heroku main</code></pre>
+<br><p>The included `Procfile` and `runtime.txt` handle deployment.</p><br><p>#### Install as CLI Command</p><br><pre><code>pip install -e .
+inventory  # Runs on port 8100 by default</code></pre>
+<br><p>---</p><br><h2>4. Configuration</h2><br><h3>Environment Variables</h3><br>| Variable | Required | Default | Description |
+<p>|----------|----------|---------|-------------|</p>| `JWT_SECRET` | **Yes** | — | Cryptographic secret for JWT tokens |
+| `ADMIN_PASS` | **Yes** | — | Initial admin user password |
+| `ADMIN_USER` | No | `admin` | Admin username |
+| `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server for email |
+| `SMTP_PORT` | No | `465` | SMTP port (465=SSL, 587=TLS) |
+| `SMTP_USER` | No | — | SMTP login email |
+| `SMTP_PASS` | No | — | SMTP app password |
+| `ALERT_EMAILS` | No | — | Comma-separated alert recipients |
+| `WEBHOOK_URL` | No | — | Webhook URL(s) for alerts |
+| `CHECK_EMAIL_PASS` | No | — | Fallback IMAP password for email checking |
+<br><h3>SMTP Setup (Gmail)</h3><br><p>1. Enable 2-Factor Authentication on your Google account</p><p>2. Generate an App Password: Google Account → Security → App passwords</p><p>3. Set `SMTP_USER` to your Gmail address and `SMTP_PASS` to the 16-character app password</p><br><h3>First Run</h3><br><p>On first startup, the application:</p><p>1. Creates `users.db` with the users table</p><p>2. Seeds an admin user (username from `ADMIN_USER`, password from `ADMIN_PASS`)</p><p>3. Creates `bani.db` and `alex.db` with all required tables</p><p>4. Seeds default fleet status categories (6 categories)</p><br><p>---</p><br><h2>5. User Interface</h2><br><h3>Login Page</h3><br><p>Dark-themed login with username/password. Authentication persists via JWT token stored in localStorage (10-hour expiry).</p><br><h3>Branch Selection</h3><br><p>Two-card layout to choose Bani Suwayf or Alexandria branch.</p><br><h3>Branch Dashboard (main SPA)</h3><br><p>12 tabs organized in a horizontal navigation bar:</p><br><p>#### 📦 Inventory Tab</p><li>Grid of item cards showing name, stock level, threshold</li>
+<li>Color-coded: normal (white), low (yellow), out-of-stock (red)</li>
+<li>Create/edit/delete items</li>
+<li>**Distribute** modal: send items to stations with truck, driver, voucher details</li>
+<li>Add stock modal</li>
+<li>Bar chart of stock levels (optional)</li>
+<br><p>#### 📜 History Tab</p><li>Global transaction history with pagination</li>
+<li>Filter by station name</li>
+<li>Shows additions, distributions with timestamps</li>
+<br><p>#### 📋 Orders Tab</p><li>Customer order management</li>
+<li>Create, accept, or refuse orders</li>
+<li>Aggregated view with grand total weight</li>
+<br><p>#### 💰 Station Accounts Tab</p><li>Per-station daily distribution summary</li>
+<li>Shows total weight delivered per station</li>
+<br><p>#### 📊 Reports Tab</p><li>Daily report with stock levels, additions, distributions</li>
+<li>Bar chart visualization</li>
+<li>Send report via email with rich HTML body</li>
+<li>Print-friendly layout</li>
+<br><p>#### 📞 Contacts Tab</p><li>Customer CRM with phone, WhatsApp integration</li>
+<li>Status tracking (available/pending)</li>
+<br><p>#### 🛰️ GPS Tab</p><li>Vehicle location tracking on OpenStreetMap</li>
+<li>Leaflet.js map with vehicle markers</li>
+<br><p>#### 🚛 Fleet Status Tab</p><li>Vehicle fleet management</li>
+<li>6 fleet categories with counts</li>
+<li>Add/remove vehicles</li>
+<li>Update fleet status counts for the work day</li>
+<br><p>#### 🏭 Cement News Tab</p><li>Scraped news from Google News RSS (Arabic)</li>
+<li>Links to full articles</li>
+<br><p>#### 🚛 Ostool Operations Tab</p><li>Fleet operations aggregation</li>
+<li>Send fleet report via email</li>
+<li>Check inbox for fleet reports</li>
+<li>Rich text email editor with formatting toolbar</li>
+<br><p>#### ⚖️ Weight Diffs Tab</p><li>Weight difference tracking (short-weight deliveries)</li>
+<li>Voucher types: 60, 65, 70 tons</li>
+<li>Auto-calculated when actual weight < voucher quantity</li>
+<li>Configurable cement price per ton</li>
+<li>Total difference and total value stats</li>
+<li>Period filters: All / Today / Week / Month</li>
+<br><p>#### 👥 Users Tab (admin only)</p><li>Create, edit, delete users</li>
+<li>Assign roles: admin, editor, viewer</li>
+<br><h3>Control Room (Monitoring Dashboard)</h3><br><p>Real-time overview of both branches:</p><li>Live clock</li>
+<li>Net stock totals per branch (with tooltip breakdown)</li>
+<li>Items count, alerts count</li>
+<li>Orders: completed ✓ / pending ⏳ (with tooltip per branch + station names)</li>
+<li>Online users</li>
+<li>Weight diffs value and quantity (with tooltip per branch and timestamp)</li>
+<li>Live bar cycling through: net stock items → distribution stations → registered trucks (per branch)</li>
+<li>Alert cards with critical/warning color coding</li>
+<li>Horizontal bar charts for stock levels (per item with unique colors)</li>
+<li>Voice reader for fleet status (text-to-speech)</li>
+<li>Auto-refresh every 15 seconds</li>
+<li>Audio alerts on new low-stock items</li>
+<br><h3>Chat Panel</h3><br><li>Real-time chat across both branches</li>
+<li>WebRTC audio/video calling</li>
+<li>User online status</li>
+<li>Draggable panel with position persistence</li>
+<br><p>---</p><br><h2>6. API Endpoints</h2><br><h3>Authentication</h3><br>| Method | Path | Auth | Description |
+<p>|--------|------|------|-------------|</p>| POST | `/api/login` | No | Login, returns JWT token |
+| GET | `/api/test` | No | Health check |
+<br><h3>Dashboard</h3><br>| Method | Path | Auth | Description |
+<p>|--------|------|------|-------------|</p>| GET | `/api/dashboard-summary` | No | Combined data for both branches |
+| GET | `/api/control-room-report` | No | Detailed report data |
+<br><h3>Inventory (per-branch, mounted at `/bani` and `/alex`)</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| GET | `/api/inventory/items` | List all active items |
+| POST | `/api/inventory/items` | Create item |
+| GET | `/api/inventory/items/{id}` | Get item details |
+| PUT | `/api/inventory/items/{id}` | Update item |
+| DELETE | `/api/inventory/items/{id}` | Archive item |
+| POST | `/api/inventory/items/{id}/restore` | Restore archived item |
+| GET | `/api/inventory/items/archived` | List archived items |
+| POST | `/api/inventory/items/{id}/add` | Add stock |
+| GET | `/api/inventory/items/{id}/transactions` | Item transaction history |
+| GET | `/api/inventory/items/{id}/distributions` | Item distributions |
+<br><h3>Distributions</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| POST | `/api/inventory/items/{id}/distribute` | Create distribution |
+| GET | `/api/inventory/distributions` | List all distributions |
+| PUT | `/api/inventory/distributions/{id}/complete` | Complete distribution |
+| GET | `/api/inventory/stations/search` | Search stations |
+| GET | `/api/inventory/distributions/stats` | Distribution statistics |
+<br><h3>Customer Orders</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| GET | `/api/inventory/orders` | List orders |
+| POST | `/api/inventory/orders` | Create order |
+| PUT | `/api/inventory/orders/{id}` | Accept/refuse order |
+| GET | `/api/inventory/orders/aggregate` | Aggregated orders |
+<br><h3>Fleet & Vehicles</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| GET | `/api/inventory/vehicles` | List vehicles |
+| POST | `/api/inventory/vehicles` | Add vehicle |
+| PUT | `/api/inventory/vehicles/{id}/location` | Update vehicle location |
+| DELETE | `/api/inventory/vehicles/{id}` | Delete vehicle |
+| GET | `/api/inventory/fleet-status` | Get fleet status |
+| PUT | `/api/inventory/fleet-status` | Update fleet status |
+<br><h3>Weight Differences</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| GET | `/api/inventory/weight-differences?period=` | List weight differences |
+| GET | `/api/inventory/weight-differences/stats?period=` | Weight diff stats |
+<br><h3>Settings</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| GET | `/api/inventory/settings/{key}` | Get setting (e.g. cement_price) |
+| PUT | `/api/inventory/settings` | Update setting |
+<br><h3>Email</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| POST | `/api/inventory/send-report` | Send daily report |
+| POST | `/api/inventory/ostool-operations/email` | Send Ostool report |
+| POST | `/api/check-email` | Check inbox |
+<br><h3>Other</h3><br>| Method | Path | Description |
+<p>|--------|------|-------------|</p>| GET | `/api/inventory/history` | Global history |
+| GET | `/api/inventory/alerts` | Low stock alerts |
+| GET | `/api/inventory/report` | Daily report data |
+| GET | `/api/inventory/cement-news` | Cement industry news |
+| GET | `/api/inventory/recipients` | Email recipients |
+| POST | `/api/inventory/recipients` | Add recipient |
+| DELETE | `/api/inventory/recipients/{id}` | Remove recipient |
+| GET | `/api/inventory/contacts` | List contacts |
+| POST | `/api/inventory/contacts` | Create contact |
+| PUT | `/api/inventory/contacts/{id}` | Update contact |
+| DELETE | `/api/inventory/contacts/{id}` | Delete contact |
+| GET | `/api/inventory/deposits` | List deposits |
+| POST | `/api/inventory/deposits` | Create deposit |
+| DELETE | `/api/inventory/deposits/{id}` | Delete deposit |
+| GET | `/api/inventory/ostool-operations` | List Ostool operations |
+| GET | `/api/inventory/ostool-stations` | List Ostool stations |
+| GET | `/api/inventory/ostool-attachments` | List attachments |
+| POST | `/api/inventory/ostool-attachments` | Upload attachment |
+| DELETE | `/api/inventory/ostool-attachments/{id}` | Delete attachment |
+| GET | `/api/inventory/distances-search` | Search distance data |
+| POST | `/api/upload` | File upload |
+| GET | `/api/active-users` | Active users |
+| GET | `/api/activity-log` | Activity log |
+<br><p>---</p><br><h2>7. Database Schema</h2><br><h3>users.db</h3><br><p>**users** — Shared authentication</p>| Column | Type | Notes |
+<p>|--------|------|-------|</p>| id | INTEGER | Primary key |
+| username | TEXT | Unique |
+| password | TEXT | bcrypt hash |
+| role | TEXT | admin / editor / viewer |
+| created_at | TEXT | ISO datetime |
+<br><h3>bani.db / alex.db (identical schemas)</h3><br><p>**items** — Inventory items</p>| Column | Type | Notes |
+<p>|--------|------|-------|</p>| id | INTEGER | Primary key |
+| name | TEXT | Unique, item name |
+| description | TEXT | Optional |
+| current_stock | REAL | Current stock level (rounded to 2 decimals) |
+| beginning_stock | REAL | Opening stock for the day |
+| warning_threshold | REAL | Alert threshold |
+| archived | INTEGER | 0=active, 1=archived |
+| created_at | TEXT | ISO datetime |
+| updated_at | TEXT | ISO datetime |
+<br><p>**transactions** — Stock movements</p>| Column | Type | Notes |
+<p>|--------|------|-------|</p>| id | INTEGER | Primary key |
+| item_id | INTEGER | FK → items.id |
+| type | TEXT | addition / distribution |
+| quantity | REAL | Amount |
+| previous_stock | REAL | Stock before |
+| new_stock | REAL | Stock after |
+| note | TEXT | Station name for distributions |
+| distribution_id | INTEGER | FK → distributions.id (nullable) |
+| created_at | TEXT | ISO datetime |
+<br><p>**distributions** — Shipments to stations</p>| Column | Type | Notes |
+<p>|--------|------|-------|</p>| id | INTEGER | Primary key |
+| item_id | INTEGER | FK → items.id |
+| station | TEXT | Destination station |
+| weight | REAL | Weight distributed |
+| transportation_company | TEXT | Carrier |
+| driver_name | TEXT | Driver |
+| truck_number | TEXT | Vehicle plate |
+| remarks | TEXT | Free text |
+| status | TEXT | pending / completed |
+| voucher_type | INTEGER | 60, 65, or 70 tons |
+| created_at | TEXT | ISO datetime |
+<br><p>**email_recipients** — Report email list</p>| Column | Type |
+<p>|--------|------|</p>| id | INTEGER | Primary key |
+| email | TEXT | Unique |
+| created_at | TEXT |
+<br><p>**customer_orders** — Orders from customers</p>| Column | Type | Notes |
+<p>|--------|------|-------|</p>| id | INTEGER | Primary key |
+| customer_name | TEXT | |
+| phone | TEXT | |
+| item_name | TEXT | |
+| quantity | REAL | |
+| unit | TEXT | ton (default) |
+| status | TEXT | pending / accepted / refused |
+| refusal_reason | TEXT | |
+| notes | TEXT | |
+| created_at | TEXT | |
+| updated_at | TEXT | |
+<br><p>**customer_contacts** — CRM</p>| Column | Type |
+<p>|--------|------|</p>| id, name, phone, has_whatsapp, status, notes, created_at, updated_at |
+<br><p>**vehicles** — Fleet vehicles</p>| Column | Type |
+<p>|--------|------|</p>| id, name, plate_number, current_location, updated_at, created_at |
+<br><p>**station_deposits** — Financial deposits</p>| Column | Type |
+<p>|--------|------|</p>| id, station_name, amount, method (Swift/Deposit), notes, created_at |
+<br><p>**fleet_status** — Fleet category counts</p>| Column | Type |
+<p>|--------|------|</p>| id, category (unique), count, notes, updated_at |
+<br><p>Default categories:</p><p>1. Registered vehicles</p><p>2. Inside the factory</p><p>3. Outside the factory</p><p>4. On the road - Going</p><p>5. On the road - Returning</p><p>6. Maintenance / Breakdown</p><br><p>**weight_differences** — Short-weight tracking</p>| Column | Type | Notes |
+<p>|--------|------|-------|</p>| id | INTEGER | Primary key |
+| distribution_id | INTEGER | FK → distributions.id |
+| item_id | INTEGER | FK → items.id |
+| station | TEXT | |
+| voucher_type | INTEGER | 60/65/70 |
+| standard_weight | REAL | Voucher weight |
+| actual_weight | REAL | Actual delivered |
+| difference | REAL | voucher - actual (if positive) |
+| price_per_ton | REAL | Cement price at time |
+| value | REAL | difference × price |
+| branch | TEXT | bani / alex |
+| created_at | TEXT | |
+<br><p>**settings** — Key-value store</p>| Column | Type |
+<p>|--------|------|</p>| key | TEXT | Primary key |
+| value | TEXT |
+<br><p>**ostool_attachments** — Uploaded files</p>| Column | Type |
+<p>|--------|------|</p>| id, filename, original_name, file_size, upload_date, ostool_date |
+<br><p>---</p><br><h2>8. Features</h2><br><h3>Weight Difference System</h3><br><p>When a distribution is completed with actual weight less than voucher quantity, the system:</p><p>1. Calculates the difference (voucher - actual)</p><p>2. Multiplies by the configured cement price per ton</p><p>3. Records the weight difference with all details</p><p>4. Shows in Weight Diffs tab with period filters (All/Today/Week/Month)</p><p>5. Aggregates in Control Room dashboard</p><br><h3>Distribution → Fleet Automation</h3><br><p>When a distribution is created (pending), the fleet "On the road - Going" count automatically increments. When completed, it decrements — keeping fleet status in sync with actual operations.</p><br><h3>Email System</h3><br><li>Daily reports with stock levels, distributions, and charts</li>
+<li>Low-stock alerts automatically sent when distribution causes stock to fall below threshold</li>
+<li>Ostool fleet report email with rich text editor</li>
+<li>Inbox checking (IMAP) for incoming fleet reports</li>
+<br><h3>Real-time Monitoring</h3><br><p>The Control Room dashboard provides:</p><li>**Alerts**: Items at or below threshold with critical/warning styling</li>
+<li>**Stock Chart**: Horizontal bar chart with per-item colors, branch prefixes</li>
+<li>**Orders**: Today's completed/pending counts</li>
+<li>**Weight Diffs**: Aggregated financial impact</li>
+<li>**Live Bar**: Cycling through stock items, distributions, trucks per branch</li>
+<li>**Voice Reader**: Reads fleet status aloud (supports AR/EN)</li>
+<li>**Audio Alerts**: Chime on new low-stock items</li>
+<br><h3>Chat & Communication</h3><br><li>Multi-branch real-time chat via WebSocket</li>
+<li>WebRTC peer-to-peer audio/video calling</li>
+<li>User presence tracking (online/offline)</li>
+<br><p>---</p><br><h2>9. Troubleshooting</h2><br><h3>Common Issues</h3><br><p>**App won't start — "JWT_SECRET environment variable is required"**</p><p>→ Set `JWT_SECRET` in `.env` file</p><br><p>**Login fails on first run**</p><p>→ Ensure `ADMIN_PASS` is set in `.env`</p><br><p>**Emails not sending**</p><p>→ Verify SMTP settings (Gmail requires app password, not regular password)</p><p>→ Check that `SMTP_USER` and `SMTP_PASS` are correct</p><br><p>**Low stock alerts not received**</p><p>→ Check `ALERT_EMAILS` configuration</p><p>→ Check server logs for SMTP errors</p><br><p>**Database errors**</p><p>→ Stop the app, delete the `.db` files, restart (they will be recreated)</p><br><p>**Port already in use**</p><p>→ Change port: `python run.py --port 8101`</p><br><p>**SQLite "database is locked"**</p><p>→ Only one process should access the database at a time</p><p>→ Restart the server</p><br><p>**Zero stock on fresh install**</p><p>→ Create items and add stock via the Inventory tab</p><br><h3>Security Notes</h3><br><li>JWT tokens expire after 10 hours</li>
+<li>Passwords are hashed with bcrypt</li>
+<li>All database queries use parameterized statements (SQL injection safe)</li>
+<li>Environment variables should never be committed to version control</li>
+<li>Use strong, unique values for `JWT_SECRET` and `ADMIN_PASS`</li>
+<li>For production, deploy behind HTTPS reverse proxy (nginx, Caddy)</li>
+<br>
+</body></html>

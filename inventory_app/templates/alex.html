@@ -78,7 +78,8 @@
         /* Chat Panel */
         #chat-panel { position: fixed; bottom: 36px; right: 8px; width: 320px; max-height: 420px; z-index: 99; display: none; flex-direction: column; border-radius: 12px; overflow: hidden; }
         #chat-panel.show { display: flex; }
-        #chat-panel .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(30,41,59,0.95); border-bottom: 1px solid #334155; }
+        #chat-panel .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(30,41,59,0.95); border-bottom: 1px solid #334155; cursor: grab; user-select: none; }
+        #chat-panel .chat-header:active { cursor: grabbing; }
         #chat-panel .chat-tabs { display: flex; gap: 4px; }
         #chat-panel .chat-tab { padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; color: #94a3b8; background: transparent; border: none; }
         #chat-panel .chat-tab.active { color: #fbbf24; background: rgba(251,191,36,0.15); }
@@ -105,6 +106,7 @@
         #chat-toggle:hover { background: #0369a1; transform: scale(1.1); }
         #chat-toggle.has-unread { animation: pulse-glow 1s infinite; }
         @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 4px rgba(2,132,199,0.5); } 50% { box-shadow: 0 0 12px rgba(2,132,199,0.8); } }
+        [contenteditable=true]:empty:before { content: attr(data-placeholder); color: #64748b; pointer-events: none; }
         /* Call Modal */
         #call-modal .call-video { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 240px; display: flex; align-items: center; justify-content: center; }
         #call-modal .call-video video { width: 100%; height: 100%; object-fit: contain; }
@@ -169,6 +171,7 @@
             <button onclick="switchMainTab('vehicles')" id="tab-main-vehicles" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="vehicles">🚛 Vehicles</button>
             <button onclick="switchMainTab('cement-news')" id="tab-main-cement-news" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="cementNews">🏭 Cement News</button>
             <button onclick="switchMainTab('ostool')" id="tab-main-ostool" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="ostool">🚛 Ostool Operation</button>
+            <button onclick="switchMainTab('weightdiffs')" id="tab-main-weightdiffs" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="weightDiffs">⚖️ Weight Diffs</button>
             <button onclick="switchMainTab('users')" id="tab-main-users" class="px-3 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition" data-i18n="users" style="display:none">👥 Users</button>
         </div>
 
@@ -369,27 +372,103 @@
 
         <div id="tab-ostool-content" class="hidden">
             <div class="flex flex-wrap gap-2 mb-4 items-center">
+                <select id="ostool-station" onchange="loadOstoolOps()" class="bg-slate-900 border border-slate-700 rounded px-2 py-2 text-white text-sm focus:outline-none focus:border-purple-500 w-[140px]">
+                    <option value="" data-i18n="allStations">All Stations</option>
+                </select>
                 <input id="ostool-date" type="date" onchange="loadOstoolOps();loadOstoolAttachments()" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
-                <input id="ostool-emails" list="ostool-email-list" autocomplete="email" placeholder="dtitan@ostool-eg.com" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-emerald-500" onchange="localStorage.setItem('ostool_emails', this.value)">
+                <input id="ostool-emails" list="ostool-email-list" autocomplete="email" placeholder="email1@example.com, email2@example.com" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-emerald-500" onchange="localStorage.setItem('ostool_emails', this.value)">
                 <datalist id="ostool-email-list"></datalist>
                 <label class="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
                     <input type="checkbox" id="ostool-include-attach" checked style="accent-color:#a78bfa;">
                     <span data-i18n="includeAttach">📎 Attach</span>
                 </label>
-                <button onclick="sendOstoolEmail()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="ostoolEmail">📧 Send</button>
+                <button onclick="sendOstoolEmail()" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="ostoolEmail">📧 Send Email</button>
+                <button id="ostool-cancel-btn" onclick="sendOstoolEmail()" class="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-bold transition hidden" data-i18n="cancel">✕ Cancel</button>
                 <button onclick="printOstool()" id="print-ostool-btn" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-bold transition" data-i18n="printOstool">🖨️ Print</button>
             </div>
             <div class="flex flex-wrap gap-2 mb-4 items-start">
-                <textarea id="ostool-email-body" rows="3" placeholder="Write email body..." class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm flex-1 min-w-[200px] focus:outline-none focus:border-rose-500 resize-none text-xs"></textarea>
+                <div class="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded focus-within:border-rose-500 overflow-hidden">
+                    <div class="flex gap-0.5 px-2 py-1.5 bg-slate-800 border-b border-slate-700">
+                        <button type="button" onclick="document.execCommand('bold')" class="px-2 py-0.5 rounded text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white" title="Bold">B</button>
+                        <button type="button" onclick="document.execCommand('italic')" class="px-2 py-0.5 rounded text-xs italic text-slate-300 hover:bg-slate-700 hover:text-white" title="Italic">I</button>
+                        <button type="button" onclick="document.execCommand('underline')" class="px-2 py-0.5 rounded text-xs underline text-slate-300 hover:bg-slate-700 hover:text-white" title="Underline">U</button>
+                        <span class="w-px bg-slate-600 mx-1"></span>
+                        <button type="button" onclick="document.execCommand('insertUnorderedList')" class="px-2 py-0.5 rounded text-xs text-slate-300 hover:bg-slate-700 hover:text-white" title="Bullet List">•≡</button>
+                        <button type="button" onclick="document.execCommand('formatBlock',false,'h4')" class="px-2 py-0.5 rounded text-xs text-slate-300 hover:bg-slate-700 hover:text-white font-bold" title="Heading">H</button>
+                        <span class="w-px bg-slate-600 mx-1"></span>
+                        <button type="button" onclick="this.parentElement.nextElementSibling.innerHTML=''" class="px-2 py-0.5 rounded text-xs text-slate-300 hover:bg-slate-700 hover:text-white" title="Clear">🗑</button>
+                    </div>
+                    <div id="ostool-email-body" contenteditable="true" data-i18n-placeholder="writeEmailBody" class="px-3 py-2 text-white text-sm min-h-[120px] outline-none text-xs leading-relaxed" style="white-space:pre-wrap;" data-placeholder="Write email body..."></div>
+                </div>
             </div>
             <div class="flex flex-wrap gap-2 mb-4 items-center">
                 <input id="ostool-attachment" type="file" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm text-xs file:bg-amber-600 file:text-white file:border-0 file:rounded file:px-3 file:py-1 file:mr-2 file:cursor-pointer file:hover:bg-amber-500">
                 <button onclick="uploadOstoolAttachment()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="uploadFile">📎 Upload</button>
+                <input id="ostool-email-password" type="password" placeholder="Email password" value="Maged@2017" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm w-[140px] focus:outline-none focus:border-sky-500 text-xs">
                 <button onclick="checkOstoolEmail()" class="bg-sky-700 hover:bg-sky-600 text-white px-3 py-2 rounded text-sm font-bold transition" data-i18n="checkEmail">📩 Check Email</button>
             </div>
             <div id="ostool-attachments-list" class="flex flex-wrap gap-2 mb-4 text-xs"></div>
+            <div id="ostool-inbox" class="glass rounded-xl p-3 mb-4 border border-slate-600 hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-sky-400" data-i18n="inbox">📥 Inbox</span>
+                    <button onclick="document.getElementById('ostool-inbox').classList.add('hidden')" class="text-slate-500 hover:text-white text-xs" style="background:none;border:none;cursor:pointer;">✕</button>
+                </div>
+                <div id="ostool-inbox-list" class="text-xs space-y-2 max-h-[300px] overflow-y-auto"></div>
+            </div>
             <div class="glass rounded-xl p-4 border border-slate-600">
                 <div id="ostool-content" class="text-xs text-slate-400">Loading...</div>
+            </div>
+        </div>
+
+        <!-- ⚖️ Weight Differences Tab -->
+        <div id="tab-weightdiffs-content" class="hidden">
+            <div class="glass rounded-xl p-4 border border-slate-600 mb-4">
+                <div class="flex flex-wrap gap-3 items-center mb-3">
+                    <h3 class="text-sm font-bold text-amber-400" style="margin:0;" data-i18n="weightDiffs">⚖️ Weight Differences</h3>
+                    <div class="flex gap-1 text-xs" id="wd-period-bar">
+                        <button class="wd-period-btn px-2 py-1 rounded bg-amber-600 text-white font-bold" data-period="all" onclick="setWdPeriod('all')" data-i18n="all">All</button>
+                        <button class="wd-period-btn px-2 py-1 rounded bg-slate-700 text-slate-300 hover:bg-slate-600" data-period="today" onclick="setWdPeriod('today')" data-i18n="today">Today</button>
+                        <button class="wd-period-btn px-2 py-1 rounded bg-slate-700 text-slate-300 hover:bg-slate-600" data-period="week" onclick="setWdPeriod('week')" data-i18n="week">Week</button>
+                        <button class="wd-period-btn px-2 py-1 rounded bg-slate-700 text-slate-300 hover:bg-slate-600" data-period="month" onclick="setWdPeriod('month')" data-i18n="month">Month</button>
+                    </div>
+                    <span class="text-xs text-slate-500 ml-auto">
+                        <span data-i18n="cementPrice">Cement Price/Ton</span>:
+                        <input id="cement-price-input" type="number" step="0.01" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs w-[100px] focus:outline-none focus:border-emerald-500" onchange="saveCementPrice()">
+                        <span class="text-slate-400">EGP</span>
+                    </span>
+                    <button onclick="loadWeightDifferences()" class="bg-sky-700 hover:bg-sky-600 text-white px-3 py-1.5 rounded text-sm font-bold transition">🔄</button>
+                </div>
+                <div class="grid grid-cols-3 gap-3 mb-4 text-center">
+                    <div class="bg-slate-800 rounded p-2">
+                        <div class="text-xs text-slate-400" data-i18n="totalDiff">Total Difference</div>
+                        <div id="wd-total-diff" class="text-lg font-bold text-amber-400">0</div>
+                    </div>
+                    <div class="bg-slate-800 rounded p-2">
+                        <div class="text-xs text-slate-400" data-i18n="totalValue">Total Value</div>
+                        <div id="wd-total-value" class="text-lg font-bold text-emerald-400">0</div>
+                    </div>
+                    <div class="bg-slate-800 rounded p-2">
+                        <div class="text-xs text-slate-400" data-i18n="count">Count</div>
+                        <div id="wd-count" class="text-lg font-bold text-sky-400">0</div>
+                    </div>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="w-full text-xs text-left" id="wd-table">
+                        <thead><tr class="text-slate-400 border-b border-slate-700">
+                            <th class="py-2 px-2" data-i18n="date">Date</th>
+                            <th class="py-2 px-2" data-i18n="item">Item</th>
+                            <th class="py-2 px-2" data-i18n="station">Station</th>
+                            <th class="py-2 px-2" data-i18n="voucherType">Voucher</th>
+                            <th class="py-2 px-2" data-i18n="standardWeight">Standard</th>
+                            <th class="py-2 px-2" data-i18n="actualWeight">Actual</th>
+                            <th class="py-2 px-2" data-i18n="diff">Diff</th>
+                            <th class="py-2 px-2" data-i18n="pricePerTon">Price/Ton</th>
+                            <th class="py-2 px-2" data-i18n="value">Value</th>
+                        </tr></thead>
+                        <tbody id="wd-body"></tbody>
+                    </table>
+                </div>
+                <p id="wd-empty" class="text-slate-500 text-center py-8 text-sm" data-i18n="noWeightDiffs">No weight differences recorded.</p>
             </div>
         </div>
 
@@ -665,7 +744,15 @@
                     <input id="dist-station" list="global-suggest" required class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500" data-i18n-placeholder="stationPlaceholder">
                 </div>
                 <div>
-                    <label class="text-xs text-slate-400 block mb-1" data-i18n="weight">Weight (tons)</label>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="voucherType">Voucher Type (ton)</label>
+                    <select id="dist-voucher" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
+                        <option value="60">60</option>
+                        <option value="65">65</option>
+                        <option value="70">70</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1" data-i18n="weight">Actual Weight (tons)</label>
                     <input id="dist-weight" required type="number" step="any" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500">
                 </div>
                 <div>
@@ -773,6 +860,7 @@
                 distHistory: 'التوزيعات',
                 distributeTitle: 'توزيع على محطة',
                 station: 'المحطة',
+                allStations: 'جميع المحطات',
                 stationPlaceholder: 'مثال: محطة الشمال',
                 weight: 'الوزن (طن)',
                 distributeBtn: 'توزيع',
@@ -825,6 +913,7 @@
                 fleetRegistered: 'المركبات المسجلة',
                 fleetInside: 'داخل المصنع',
                 fleetOutside: 'خارج المصنع',
+                fleetInsideStation: 'داخل المحطة',
                 fleetGoing: 'في الطريق — ذهاب',
                 fleetReturning: 'في الطريق — عودة',
                 fleetMaintenance: 'صيانة / أعطال',
@@ -895,7 +984,7 @@
                 driverName: 'اسم السائق',
                 truckNumber: 'رقم السيارة',
                 remarks: 'ملاحظات',
-                ostoolEmail: '📧 إيميل إلى الاسطول',
+                ostoolEmail: '📧 إرسال إيميل',
                 printOstool: '🖨️ طباعة',
                 ostoolTotalOps: 'إجمالي العمليات',
                 ostoolTotalWeight: 'إجمالي الوزن',
@@ -906,8 +995,12 @@
                 ostoolEmailSent: 'تم إرسال تقرير الاسطول عبر الإيميل',
                 includeAttach: '📎 المرفقات',
                 sending: 'جارٍ الإرسال',
+                writeEmailBody: 'اكتب نص الإيميل...',
                 uploadFile: '📎 رفع ملف',
                 checkEmail: '📩 فحص البريد',
+                inbox: '📥 صندوق الوارد',
+                cancel: '✕ إلغاء',
+                cancelled: 'تم الإلغاء',
                 checking: 'جارٍ الفحص',
                 emailsFound: 'رسائل جديدة وُجدت',
                 from: 'من',
@@ -957,6 +1050,23 @@
                 micUnavailable: 'الميكروفون غير متاح',
                 camUnavailable: 'الكاميرا غير متاحة',
                 you: 'أنت',
+                weightDiffs: '⚖️ فروق الوزن',
+                voucherType: 'نوع البون (طن)',
+                actualWeight: 'الوزن الفعلي',
+                cementPrice: 'سعر الطن',
+                totalDiff: 'إجمالي الفرق',
+                totalValue: 'إجمالي القيمة',
+                standardWeight: 'المعيار',
+                diff: 'الفرق',
+                pricePerTon: 'سعر/طن',
+                value: 'القيمة',
+                noWeightDiffs: 'لا توجد فروق وزن مسجلة.',
+                saved: '✅ تم الحفظ',
+                count: 'العدد',
+                all: 'الكل',
+                today: 'اليوم',
+                week: 'أسبوع',
+                month: 'شهر',
             },
             en: {
                 pageTitle: 'Alexandria Cement Movement | Inventory Balance Movement',
@@ -1008,6 +1118,7 @@
                 distHistory: 'Distributions',
                 distributeTitle: 'Distribute to Station',
                 station: 'Station',
+                allStations: 'All - Station',
                 stationPlaceholder: 'e.g. North Station',
                 weight: 'Weight (tons)',
                 distributeBtn: 'Distribute',
@@ -1060,6 +1171,7 @@
                 fleetRegistered: 'Registered vehicles',
                 fleetInside: 'Inside the factory',
                 fleetOutside: 'Outside the factory',
+                fleetInsideStation: 'Inside Station',
                 fleetGoing: 'On the road — Going',
                 fleetReturning: 'On the road — Returning',
                 fleetMaintenance: 'Maintenance / Breakdown',
@@ -1129,7 +1241,7 @@
                 driverName: 'Driver Name',
                 truckNumber: 'Truck Number',
                 remarks: 'Remarks',
-                ostoolEmail: '📧 Email to Ostool',
+                ostoolEmail: '📧 Send Email',
                 printOstool: '🖨️ Print',
                 ostoolTotalOps: 'Total Operations',
                 ostoolTotalWeight: 'Total Weight',
@@ -1140,8 +1252,12 @@
                 ostoolEmailSent: 'Ostool report sent via email',
                 includeAttach: '📎 Attach',
                 sending: 'Sending...',
+                writeEmailBody: 'Write email body...',
                 uploadFile: '📎 Upload',
                 checkEmail: '📩 Check Email',
+                inbox: '📥 Inbox',
+                cancel: '✕ Cancel',
+                cancelled: 'Cancelled',
                 checking: 'Checking...',
                 emailsFound: 'New emails found',
                 from: 'From',
@@ -1191,6 +1307,23 @@
                 micUnavailable: 'Microphone not available',
                 camUnavailable: 'Camera not available',
                 you: 'You',
+                weightDiffs: '⚖️ Weight Diffs',
+                voucherType: 'Voucher Type (ton)',
+                actualWeight: 'Actual Weight',
+                cementPrice: 'Cement Price/Ton',
+                totalDiff: 'Total Difference',
+                totalValue: 'Total Value',
+                standardWeight: 'Standard',
+                diff: 'Diff',
+                pricePerTon: 'Price/Ton',
+                value: 'Value',
+                noWeightDiffs: 'No weight differences recorded.',
+                saved: '✅ Saved',
+                count: 'Count',
+                all: 'All',
+                today: 'Today',
+                week: 'Week',
+                month: 'Month',
             }
         };
 
@@ -1209,7 +1342,11 @@
                 if (key !== 'title') el.textContent = t(key);
             });
             document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-                el.placeholder = t(el.dataset.i18nPlaceholder);
+                if (el.contentEditable === 'true') {
+                    el.dataset.placeholder = t(el.dataset.i18nPlaceholder);
+                } else {
+                    el.placeholder = t(el.dataset.i18nPlaceholder);
+                }
             });
             document.getElementById('lang-btn').textContent = t('langBtn');
             document.getElementById('new-item-btn').textContent = t('newItem');
@@ -1234,7 +1371,7 @@
             if (u.includes('/api/')) {
                 opts.headers = opts.headers || {};
                 opts.headers['Authorization'] = 'Bearer ' + token;
-                if (opts.body && !opts.headers['Content-Type']) {
+                if (opts.body && !opts.headers['Content-Type'] && !(opts.body instanceof FormData)) {
                     opts.headers['Content-Type'] = 'application/json';
                 }
                 a[0] = opts;
@@ -1265,6 +1402,7 @@
             const cnt = document.getElementById('tab-contacts-content');
             const ost = document.getElementById('tab-ostool-content');
             const usr = document.getElementById('tab-users-content');
+            const wdd = document.getElementById('tab-weightdiffs-content');
             const btnInv = document.getElementById('tab-main-inventory');
             const btnHist = document.getElementById('tab-main-history');
             const btnRep = document.getElementById('tab-main-reports');
@@ -1276,8 +1414,9 @@
             const btnCnt = document.getElementById('tab-main-contacts');
             const btnOst = document.getElementById('tab-main-ostool');
             const btnUsr = document.getElementById('tab-main-users');
-            [inv, hist, rep, gps, veh, acc, ord, cnw, cnt, ost, usr].forEach(el => el && el.classList.add('hidden'));
-            [btnInv, btnHist, btnRep, btnGps, btnVeh, btnAcc, btnOrd, btnCnw, btnCnt, btnOst, btnUsr].forEach(el => {
+            const btnWdd = document.getElementById('tab-main-weightdiffs');
+            [inv, hist, rep, gps, veh, acc, ord, cnw, cnt, ost, usr, wdd].forEach(el => el && el.classList.add('hidden'));
+            [btnInv, btnHist, btnRep, btnGps, btnVeh, btnAcc, btnOrd, btnCnw, btnCnt, btnOst, btnUsr, btnWdd].forEach(el => {
                 if (el) el.className = 'px-4 py-2 text-sm font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition';
             });
             if (tab === 'inventory') {
@@ -1319,6 +1458,12 @@
                 btnOst.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
                 loadOstoolOps();
                 loadOstoolAttachments();
+                loadOstoolStations();
+            } else if (tab === 'weightdiffs') {
+                wdd.classList.remove('hidden');
+                btnWdd.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
+                loadWeightDifferences();
+                loadCementPrice();
             } else if (tab === 'users') {
                 usr.classList.remove('hidden');
                 btnUsr.className = 'px-4 py-2 text-sm font-bold border-b-2 border-amber-400 text-amber-400 transition';
@@ -2231,7 +2376,7 @@
             const item = await res.json();
             document.getElementById('detail-name').textContent = item.name;
             document.getElementById('detail-desc').textContent = item.description || '';
-            document.getElementById('detail-stock').textContent = item.current_stock;
+            document.getElementById('detail-stock').textContent = Number(item.current_stock).toFixed(2);
             document.getElementById('detail-threshold').textContent = item.warning_threshold;
             const statusEl = document.getElementById('detail-status');
             if (item.current_stock <= 0) { statusEl.textContent = t('out'); statusEl.className = 'text-xl font-bold text-red-400'; }
@@ -2430,6 +2575,7 @@
 
         async function confirmDistribute() {
             const station = document.getElementById('dist-station').value.trim();
+            const voucher_type = parseInt(document.getElementById('dist-voucher').value) || 60;
             const weight = parseFloat(document.getElementById('dist-weight').value);
             const transportation_company = document.getElementById('dist-transport').value.trim();
             const driver_name = document.getElementById('dist-driver').value.trim();
@@ -2443,7 +2589,7 @@
             const res = await fetch(`/api/inventory/items/${selectedItemId}/distribute`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ station, weight, transportation_company, driver_name, truck_number, remarks })
+                body: JSON.stringify({ station, voucher_type, weight, transportation_company, driver_name, truck_number, remarks })
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -2742,11 +2888,69 @@
                 chatUnread = 0;
                 document.getElementById('chat-toggle').classList.remove('has-unread');
                 if (!chatConnected) connectChat();
+                const saved = localStorage.getItem('chat_panel_pos');
+                if (saved) {
+                    try {
+                        const pos = JSON.parse(saved);
+                        panel.style.bottom = pos.bottom;
+                        panel.style.right = pos.right;
+                        if (pos.left) panel.style.left = pos.left;
+                        if (pos.top) panel.style.top = pos.top;
+                    } catch {}
+                }
             }
         }
 
-        // ─── Media Checks ──────────────────────────────────────────
-        let _mediaCache = null;
+        function makeChatDraggable() {
+            const panel = document.getElementById('chat-panel');
+            const header = panel?.querySelector('.chat-header');
+            if (!header) return;
+            let drag = false, startX, startY, origX, origY;
+            header.addEventListener('mousedown', e => {
+                if (e.target.closest('button, .chat-tabs')) return;
+                drag = true;
+                const rect = panel.getBoundingClientRect();
+                startX = e.clientX;
+                startY = e.clientY;
+                origX = rect.left;
+                origY = rect.top;
+                panel.style.bottom = 'auto';
+                panel.style.right = 'auto';
+                panel.style.left = rect.left + 'px';
+                panel.style.top = rect.top + 'px';
+                panel.style.transition = 'none';
+            });
+            document.addEventListener('mousemove', e => {
+                if (!drag) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                const pw = panel.offsetWidth, ph = panel.offsetHeight;
+                const maxL = window.innerWidth - pw / 4;
+                const minL = -(pw - pw / 4);
+                const maxT = window.innerHeight - ph / 4;
+                const minT = -(ph - ph / 4);
+                panel.style.left = Math.min(maxL, Math.max(minL, origX + dx)) + 'px';
+                panel.style.top = Math.min(maxT, Math.max(minT, origY + dy)) + 'px';
+            });
+            document.addEventListener('mouseup', () => {
+                if (!drag) return;
+                drag = false;
+                panel.style.transition = '';
+                const rect = panel.getBoundingClientRect();
+                const pos = {};
+                if (rect.top > window.innerHeight / 2) {
+                    pos.bottom = (window.innerHeight - rect.bottom) + 'px';
+                } else {
+                    pos.top = rect.top + 'px';
+                }
+                if (rect.left > window.innerWidth / 2) {
+                    pos.right = (window.innerWidth - rect.right) + 'px';
+                } else {
+                    pos.left = rect.left + 'px';
+                }
+                try { localStorage.setItem('chat_panel_pos', JSON.stringify(pos)); } catch {}
+            });
+        }
         async function checkMedia(kind) {
             if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return false;
             try {
@@ -3035,12 +3239,13 @@
                 const map = {};
                 data.forEach(r => { map[r.category] = r; });
                 const cats = [
-                    { key: 'fleetRegistered', cat: 'Registered vehicles', icon: '📋' },
-                    { key: 'fleetInside', cat: 'Inside the factory', icon: '🏭' },
-                    { key: 'fleetOutside', cat: 'Outside the factory', icon: '🌍' },
-                    { key: 'fleetGoing', cat: 'On the road - Going', icon: '🚚➡️' },
-                    { key: 'fleetReturning', cat: 'On the road - Returning', icon: '🚚⬅️' },
-                    { key: 'fleetMaintenance', cat: 'Maintenance / Breakdown', icon: '🔧' },
+                    { key: 'fleetRegistered', cat: 'Registered vehicles', icon: '🚛' },
+                    { key: 'fleetInside', cat: 'Inside the factory', icon: '🚛' },
+                    { key: 'fleetOutside', cat: 'Outside the factory', icon: '🚛' },
+                    { key: 'fleetInsideStation', cat: 'Inside Station', icon: '🚛' },
+                    { key: 'fleetGoing', cat: 'On the road - Going', icon: '🚛' },
+                    { key: 'fleetReturning', cat: 'On the road - Returning', icon: '🚛' },
+                    { key: 'fleetMaintenance', cat: 'Maintenance / Breakdown', icon: '🚛' },
                 ];
                 el.innerHTML = cats.map(c => {
                     const r = map[c.cat] || { count: 0, updated_at: '' };
@@ -3076,7 +3281,9 @@
             const el = document.getElementById('ostool-content');
             try {
                 const date = document.getElementById('ostool-date')?.value || '';
-                const url = date ? '/api/inventory/ostool-operations?date=' + encodeURIComponent(date) : '/api/inventory/ostool-operations';
+                const station = document.getElementById('ostool-station')?.value || '';
+                let url = '/api/inventory/ostool-operations?date=' + encodeURIComponent(date);
+                if (station) url += '&station=' + encodeURIComponent(station);
                 const res = await fetch(url);
                 const data = await res.json();
                 if (!data.companies.length) {
@@ -3124,32 +3331,156 @@
             }
         }
 
+        // ─── Weight Differences ──────────────────────────────────
+        let _wdPeriod = 'all';
+
+        function setWdPeriod(period) {
+            _wdPeriod = period;
+            document.querySelectorAll('.wd-period-btn').forEach(b => {
+                if (b.dataset.period === period) {
+                    b.className = 'wd-period-btn px-2 py-1 rounded bg-amber-600 text-white font-bold';
+                } else {
+                    b.className = 'wd-period-btn px-2 py-1 rounded bg-slate-700 text-slate-300 hover:bg-slate-600';
+                }
+            });
+            loadWeightDifferences();
+        }
+
+        async function loadWeightDifferences() {
+            try {
+                const [res, statsRes] = await Promise.all([
+                    fetch('/api/inventory/weight-differences?period=' + _wdPeriod),
+                    fetch('/api/inventory/weight-differences/stats?period=' + _wdPeriod)
+                ]);
+                const data = await res.json();
+                const stats = await statsRes.json();
+                if (stats) {
+                    const elDiff = document.getElementById('wd-total-diff');
+                    const elVal = document.getElementById('wd-total-value');
+                    const elCnt = document.getElementById('wd-count');
+                    if (elDiff) elDiff.textContent = (stats.total_difference || 0).toFixed(2);
+                    if (elVal) elVal.textContent = (stats.total_value || 0).toFixed(2);
+                    if (elCnt) elCnt.textContent = stats.count || 0;
+                }
+                const tbody = document.getElementById('wd-body');
+                const empty = document.getElementById('wd-empty');
+                if (!tbody) return;
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '';
+                    if (empty) empty.style.display = 'block';
+                    return;
+                }
+                if (empty) empty.style.display = 'none';
+                tbody.innerHTML = data.map(r => {
+                    const diff = r.difference.toFixed(2);
+                    const val = r.value.toFixed(2);
+                    return '<tr class="border-b border-slate-800 hover:bg-slate-800/50">' +
+                        '<td class="py-2 px-2">' + new Date(r.created_at).toLocaleDateString() + '</td>' +
+                        '<td class="py-2 px-2">' + esc(r.item_name || '') + '</td>' +
+                        '<td class="py-2 px-2">' + esc(r.station || '') + '</td>' +
+                        '<td class="py-2 px-2">' + r.voucher_type + '</td>' +
+                        '<td class="py-2 px-2">' + r.standard_weight.toFixed(2) + '</td>' +
+                        '<td class="py-2 px-2">' + r.actual_weight.toFixed(2) + '</td>' +
+                        '<td class="py-2 px-2 text-rose-400">' + diff + '</td>' +
+                        '<td class="py-2 px-2">' + r.price_per_ton.toFixed(2) + '</td>' +
+                        '<td class="py-2 px-2 text-emerald-400 font-bold">' + val + '</td>' +
+                        '</tr>';
+                }).join('');
+            } catch {
+                const tbody = document.getElementById('wd-body');
+                if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center text-red-400 py-4">Error loading</td></tr>';
+            }
+        }
+
+        async function loadCementPrice() {
+            try {
+                const res = await fetch('/api/inventory/settings/cement_price');
+                const data = await res.json();
+                const inp = document.getElementById('cement-price-input');
+                if (inp) inp.value = data.value || 0;
+            } catch {}
+        }
+
+        async function saveCementPrice() {
+            const inp = document.getElementById('cement-price-input');
+            if (!inp) return;
+            const val = parseFloat(inp.value) || 0;
+            try {
+                await fetch('/api/inventory/settings', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({key: 'cement_price', value: val})
+                });
+                toast(t('saved'), 'success');
+                loadWeightDifferences();
+            } catch {}
+        }
+
+        let _sendOstoolAbort = null;
+
+        async function loadOstoolStations() {
+            try {
+                const res = await fetch('/api/inventory/ostool-stations');
+                const data = await res.json();
+                const sel = document.getElementById('ostool-station');
+                if (!sel) return;
+                const cur = sel.value;
+                sel.innerHTML = '<option value="">' + t('allStations') + '</option>';
+                data.forEach(s => {
+                    const o = document.createElement('option');
+                    o.value = s; o.textContent = s;
+                    sel.appendChild(o);
+                });
+                if (cur) sel.value = cur;
+            } catch {}
+        }
+
         async function sendOstoolEmail() {
+            if (_sendOstoolAbort) {
+                _sendOstoolAbort.abort();
+                _sendOstoolAbort = null;
+                const btn = document.querySelector('[onclick="sendOstoolEmail()"]');
+                if (btn) { btn.textContent = t('ostoolEmail'); btn.disabled = false; }
+                const cancel = document.getElementById('ostool-cancel-btn');
+                if (cancel) cancel.classList.add('hidden');
+                toast(t('cancelled'));
+                return;
+            }
+            const ac = new AbortController();
+            _sendOstoolAbort = ac;
             const btn = event.target;
-            const orig = btn.textContent;
+            const orig = t('ostoolEmail');
             btn.textContent = t('sending') + '...';
             btn.disabled = true;
+            const cancel = document.getElementById('ostool-cancel-btn');
+            if (cancel) cancel.classList.remove('hidden');
             const date = document.getElementById('ostool-date')?.value || '';
+            const station = document.getElementById('ostool-station')?.value || '';
             const to_emails = document.getElementById('ostool-emails')?.value.trim() || '';
-            const email_body = document.getElementById('ostool-email-body')?.value.trim() || '';
+            let email_body = document.getElementById('ostool-email-body')?.innerHTML.trim() || '';
+            if (email_body === '<br>' || email_body === '') email_body = '';
             const include_attach = document.getElementById('ostool-include-attach')?.checked || false;
             try {
                 const res = await fetch('/api/inventory/ostool-operations/email', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ date, email_body, to_emails, include_attach })
+                    body: JSON.stringify({ date, station, email_body, to_emails, include_attach }),
+                    signal: ac.signal
                 });
                 const data = await res.json();
                 if (data.ok) {
-                    alert(t('ostoolEmailSent'));
+                    toast(t('ostoolEmailSent'));
                 } else {
-                    alert(t('error') + ': ' + (data.error || ''));
+                    toast(t('error') + ': ' + (data.error || ''));
                 }
-            } catch {
-                alert(t('error'));
+            } catch (e) {
+                if (e.name === 'AbortError') { toast(t('cancelled')); }
+                else { toast(t('error')); }
             }
+            _sendOstoolAbort = null;
             btn.textContent = orig;
             btn.disabled = false;
+            if (cancel) cancel.classList.add('hidden');
         }
 
         function printOstool() {
@@ -3227,26 +3558,39 @@
             const orig = btn.textContent;
             btn.textContent = t('checking') + '...';
             btn.disabled = true;
+            const password = document.getElementById('ostool-email-password')?.value || '';
             try {
                 const res = await fetch('/api/check-email', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({})
+                    body: JSON.stringify({password})
                 });
                 const data = await res.json();
+                const inbox = document.getElementById('ostool-inbox');
+                const list = document.getElementById('ostool-inbox-list');
                 if (data.ok && data.count > 0) {
-                    let msg = t('emailsFound') + ': ' + data.count + '\n';
-                    data.emails.forEach(e => {
-                        msg += '\n📧 ' + e.subject + '\n   ' + t('from') + ': ' + e.from;
-                        if (e.attachments.length) {
-                            msg += '\n   📎 ' + t('attachments') + ':';
-                            e.attachments.forEach(a => msg += '\n      - ' + a.original + ' (' + a.url + ')');
-                        }
-                    });
-                    alert(msg);
+                    list.innerHTML = data.emails.map(e => {
+                        const atts = (e.attachments || []).map(a =>
+                            '<a href="' + a.url + '" target="_blank" class="text-emerald-400 hover:text-emerald-300 underline ml-1">📎 ' + esc(a.original) + '</a>'
+                        ).join('');
+                        const body = e.body ? '<div class="text-slate-500 mt-1 text-[10px] line-clamp-2">' + esc(e.body) + '</div>' : '';
+                        return '<div class="bg-slate-800/60 border border-slate-700 rounded-lg p-2">' +
+                            '<div class="flex items-start justify-between gap-2">' +
+                            '<div class="min-w-0 flex-1">' +
+                            '<div class="text-sky-300 font-semibold truncate">' + esc(e.subject) + '</div>' +
+                            '<div class="text-slate-400 text-[10px] truncate">' + esc(e.from) + '</div>' +
+                            '</div>' +
+                            '<span class="text-slate-600 text-[9px] whitespace-nowrap flex-shrink-0">' + esc(e.date || '').slice(0, 16) + '</span>' +
+                            '</div>' +
+                            (atts ? '<div class="mt-1 text-[10px]">' + atts + '</div>' : '') +
+                            body +
+                            '</div>';
+                    }).join('');
+                    inbox.classList.remove('hidden');
                     if (data.emails.some(e => e.attachments.length)) loadOstoolAttachments();
                 } else if (data.ok) {
-                    alert(t('noNewEmails'));
+                    list.innerHTML = '<div class="text-slate-500 text-center py-4" data-i18n="noNewEmails">' + t('noNewEmails') + '</div>';
+                    inbox.classList.remove('hidden');
                 } else {
                     alert(t('error') + ': ' + (data.error || ''));
                 }
@@ -3387,6 +3731,8 @@
         loadActiveUsers();
         setInterval(loadActiveUsers, 10000);
         connectChat();
+        makeChatDraggable();
+        loadOstoolStations();
         logActivity('login', 'logged in');
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/static/sw.js').catch(() => {});

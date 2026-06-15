@@ -18,7 +18,9 @@ from jose import jwt
 from passlib.context import CryptContext
 
 # ─── Auth ─────────────────────────────────────────────────────────
-SECRET_KEY = os.environ.get("JWT_SECRET", "inventory-secret-change-me")
+SECRET_KEY = os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET environment variable is required")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES =600
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -46,7 +48,9 @@ def init_users_db():
     except sqlite3.OperationalError:
         pass
     admin_user = os.environ.get("ADMIN_USER", "admin")
-    admin_pass = os.environ.get("ADMIN_PASS", "admin123")
+    admin_pass = os.environ.get("ADMIN_PASS")
+    if not admin_pass:
+        raise RuntimeError("ADMIN_PASS environment variable is required")
     existing = conn.execute("SELECT id FROM users WHERE username=?", (admin_user,)).fetchone()
     if not existing:
         conn.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')",
@@ -373,7 +377,12 @@ class InventoryBranch:
         self.router.add_api_route("/api/inventory/ostool-attachments", self.list_ostool_attachments, methods=["GET"])
         self.router.add_api_route("/api/inventory/ostool-attachments", self.upload_ostool_attachment, methods=["POST"])
         self.router.add_api_route("/api/inventory/ostool-attachments/{attach_id}", self.delete_ostool_attachment, methods=["DELETE"])
+        self.router.add_api_route("/api/inventory/ostool-stations", self.list_ostool_stations, methods=["GET"])
         self.router.add_api_route("/api/inventory/distances-search", self.search_distances_files, methods=["GET"])
+        self.router.add_api_route("/api/inventory/weight-differences", self.list_weight_differences, methods=["GET"])
+        self.router.add_api_route("/api/inventory/weight-differences/stats", self.get_weight_differences_stats, methods=["GET"])
+        self.router.add_api_route("/api/inventory/settings/{key}", self.get_setting, methods=["GET"])
+        self.router.add_api_route("/api/inventory/settings", self.set_setting, methods=["PUT"])
         self.router.add_api_route("/api/active-users", self.get_active_users, methods=["GET"])
 
     def db(self):
@@ -416,6 +425,7 @@ class InventoryBranch:
                 weight REAL NOT NULL,
                 transportation_company TEXT NOT NULL DEFAULT '',
                 status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','completed')),
+                voucher_type INTEGER DEFAULT 60,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (item_id) REFERENCES items(id)
             );
@@ -470,6 +480,25 @@ class InventoryBranch:
                 notes TEXT DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS weight_differences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                distribution_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                station TEXT NOT NULL,
+                voucher_type INTEGER NOT NULL,
+                standard_weight REAL NOT NULL,
+                actual_weight REAL NOT NULL,
+                difference REAL NOT NULL,
+                price_per_ton REAL NOT NULL DEFAULT 0,
+                value REAL NOT NULL DEFAULT 0,
+                branch TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (distribution_id) REFERENCES distributions(id)
+            );
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
         """)
         # Seed default fleet status records
         default_categories = [
@@ -505,6 +534,10 @@ class InventoryBranch:
             pass
         try:
             conn.execute("ALTER TABLE distributions ADD COLUMN remarks TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE distributions ADD COLUMN voucher_type INTEGER DEFAULT 60")
         except Exception:
             pass
         try:
@@ -544,7 +577,7 @@ class InventoryBranch:
         if not name:
             raise HTTPException(400, "Name required")
         desc = item.get("description", "")
-        bs = float(item.get("beginning_stock", 0))
+        bs = round(float(item.get("beginning_stock", 0)), 2)
         wt = float(item.get("warning_threshold", 10))
         now = datetime.utcnow().isoformat()
         conn = self.db()
@@ -623,8 +656,8 @@ class InventoryBranch:
         if not item:
             conn.close()
             raise HTTPException(404)
-        prev = item["current_stock"]
-        new = prev + qty
+        prev = round(item["current_stock"], 2)
+        new = round(prev + qty, 2)
         now = datetime.utcnow().isoformat()
         conn.execute("UPDATE items SET current_stock=?, updated_at=? WHERE id=?", (new, now, item_id))
         conn.execute("INSERT INTO transactions (item_id, type, quantity, previous_stock, new_stock, note, created_at) VALUES (?, 'addition', ?, ?, ?, ?, ?)", (item_id, qty, prev, new, note, now))
@@ -641,6 +674,7 @@ class InventoryBranch:
         weight = float(body.get("weight", 0))
         if weight <= 0:
             raise HTTPException(400, "Weight must be positive")
+        voucher_type = int(body.get("voucher_type", 60))
         transportation_company = body.get("transportation_company", "").strip()
         driver_name = body.get("driver_name", "").strip()
         truck_number = body.get("truck_number", "").strip()
@@ -652,9 +686,12 @@ class InventoryBranch:
             raise HTTPException(404)
         now = datetime.utcnow().isoformat()
         conn.execute(
-            "INSERT INTO distributions (item_id, station, weight, transportation_company, driver_name, truck_number, remarks, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
-            (item_id, station, weight, transportation_company, driver_name, truck_number, remarks, now),
+            "INSERT INTO distributions (item_id, station, weight, voucher_type, transportation_company, driver_name, truck_number, remarks, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
+            (item_id, station, weight, voucher_type, transportation_company, driver_name, truck_number, remarks, now),
         )
+        conn.commit()
+        # Increment fleet status "On the road - Going"
+        conn.execute("UPDATE fleet_status SET count = count + 1, updated_at = datetime('now') WHERE category = 'On the road - Going'")
         conn.commit()
         row = conn.execute("SELECT * FROM distributions WHERE id=?", (conn.execute("SELECT last_insert_rowid()").fetchone()[0],)).fetchone()
         conn.close()
@@ -835,11 +872,11 @@ class InventoryBranch:
         item_id = dist["item_id"]
         item = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
         weight = dist["weight"]
-        prev = item["current_stock"]
+        prev = round(item["current_stock"], 2)
         if prev < weight:
             conn.close()
             raise HTTPException(400, f"Insufficient stock. Available: {prev}, required: {weight}")
-        new_stock = prev - weight
+        new_stock = round(prev - weight, 2)
         now = datetime.utcnow().isoformat()
         conn.execute("UPDATE items SET current_stock=?, updated_at=? WHERE id=?", (new_stock, now, item_id))
         conn.execute(
@@ -847,6 +884,20 @@ class InventoryBranch:
             (item_id, weight, prev, new_stock,             dist['station'], dist_id, now),
         )
         conn.execute("UPDATE distributions SET status='completed' WHERE id=?", (dist_id,))
+        # Decrement fleet "On the road - Going" (truck arrived)
+        conn.execute("UPDATE fleet_status SET count = MAX(0, count - 1), updated_at = datetime('now') WHERE category = 'On the road - Going'")
+        conn.commit()
+        # Weight difference calculation
+        voucher_type = dist["voucher_type"] or 60
+        if weight < voucher_type:
+            diff = voucher_type - weight
+            price_row = conn.execute("SELECT value FROM settings WHERE key='cement_price'").fetchone()
+            price_per_ton = float(price_row["value"]) if price_row else 0
+            val = diff * price_per_ton
+            conn.execute(
+                "INSERT INTO weight_differences (distribution_id, item_id, station, voucher_type, standard_weight, actual_weight, difference, price_per_ton, value, branch, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (dist_id, item_id, dist["station"], voucher_type, voucher_type, weight, diff, price_per_ton, val, self.name, now),
+            )
         conn.commit()
         dist = conn.execute("SELECT * FROM distributions WHERE id=?", (dist_id,)).fetchone()
         if new_stock <= item["warning_threshold"]:
@@ -1270,6 +1321,7 @@ class InventoryBranch:
         email_body = body.get("email_body", "").strip()
         date = body.get("date", "").strip()
         include_attach = body.get("include_attach", False)
+        station = body.get("station", "").strip()
         conn = self.db()
         where = self._ostool_where()
         params = []
@@ -1278,6 +1330,9 @@ class InventoryBranch:
             date = dt_date.today().isoformat()
         where += " AND DATE(d.created_at) = ?"
         params.append(date)
+        if station:
+            where += " AND d.station = ?"
+            params.append(station)
         rows = conn.execute(
             f"""SELECT d.*, i.name as item_name
                 FROM distributions d
@@ -1296,12 +1351,16 @@ class InventoryBranch:
             f"SELECT COUNT(*) as c FROM distributions d WHERE {where}", params
         ).fetchone()["c"]
         attach_files = []
+        attach_html = ""
         if include_attach:
-            att_rows = conn.execute("SELECT filename FROM ostool_attachments WHERE ostool_date=?", (date,)).fetchall()
+            att_rows = conn.execute("SELECT original_name, filename FROM ostool_attachments WHERE ostool_date=?", (date,)).fetchall()
             for r in att_rows:
                 fp = UPLOAD_DIR / r["filename"]
                 if fp.exists():
                     attach_files.append(str(fp))
+                    attach_html += f'<div style="padding:2px 0;font-size:12px;color:#1e40af;">📎 {r["original_name"]}</div>'
+            if attach_html:
+                attach_html = f'<div style="padding:8px 16px;background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1e3a8a;"><strong>Attachments:</strong>{attach_html}</div>'
         conn.close()
         ops_rows = ""
         for r in rows:
@@ -1332,7 +1391,7 @@ class InventoryBranch:
           <span>Total Ops / إجمالي العمليات: {grand_total_ops}</span>
           <span>Total Weight / إجمالي الوزن: {grand_total_weight:.2f} t</span>
         </div>"""
-        html += f"""{email_body_html}
+        html += f"""{email_body_html}{attach_html}
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead><tr style="background:#92400e;color:white">
         <th style="padding:8px;text-align:left">الشركة الناقلة</th>
@@ -1361,6 +1420,12 @@ class InventoryBranch:
         return {"ok": True, "sent_to": to_emails, "attachments": len(attach_files)}
 
     # ─── Ostool Attachments ───
+    async def list_ostool_stations(self):
+        conn = self.db()
+        rows = conn.execute("SELECT DISTINCT station FROM distributions WHERE transportation_company LIKE '%ostool%' OR transportation_company LIKE '%Ostool%' OR transportation_company LIKE '%اسطول%' ORDER BY station").fetchall()
+        conn.close()
+        return [r["station"] for r in rows]
+
     async def list_ostool_attachments(self, date: str = ""):
         conn = self.db()
         if date:
@@ -1447,6 +1512,61 @@ class InventoryBranch:
         rows = conn.execute("SELECT * FROM items WHERE archived=0 AND current_stock <= warning_threshold ORDER BY current_stock ASC").fetchall()
         conn.close()
         return [dict(r) for r in rows]
+
+    # ─── Weight Differences ───
+    async def list_weight_differences(self, period: str = 'all'):
+        conn = self.db()
+        where = ""
+        if period == 'today':
+            where = "WHERE DATE(wd.created_at) = DATE('now')"
+        elif period == 'week':
+            where = "WHERE wd.created_at >= datetime('now', '-7 days')"
+        elif period == 'month':
+            where = "WHERE wd.created_at >= datetime('now', '-30 days')"
+        rows = conn.execute(
+            f"""SELECT wd.*, i.name as item_name
+               FROM weight_differences wd
+               LEFT JOIN items i ON i.id = wd.item_id
+               {where}
+               ORDER BY wd.created_at DESC LIMIT 200"""
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    async def get_weight_differences_stats(self, period: str = 'all'):
+        conn = self.db()
+        where = ""
+        if period == 'today':
+            where = "WHERE DATE(created_at) = DATE('now')"
+        elif period == 'week':
+            where = "WHERE created_at >= datetime('now', '-7 days')"
+        elif period == 'month':
+            where = "WHERE created_at >= datetime('now', '-30 days')"
+        total_diff = conn.execute(f"SELECT COALESCE(SUM(difference),0) as s FROM weight_differences {where}").fetchone()["s"]
+        count = conn.execute(f"SELECT COUNT(*) as c FROM weight_differences {where}").fetchone()["c"]
+        price_row = conn.execute("SELECT value FROM settings WHERE key='cement_price'").fetchone()
+        cement_price = float(price_row["value"]) if price_row else 0
+        total_value = total_diff * cement_price
+        conn.close()
+        return {"total_difference": total_diff, "total_value": total_value, "count": count, "cement_price": cement_price}
+
+    # ─── Settings ───
+    async def get_setting(self, key: str):
+        conn = self.db()
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        conn.close()
+        return {"key": key, "value": float(row["value"]) if row else 0}
+
+    async def set_setting(self, body: dict):
+        key = body.get("key", "").strip()
+        value = str(body.get("value", "0"))
+        if not key:
+            raise HTTPException(400, "key required")
+        conn = self.db()
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (key, value))
+        conn.commit()
+        conn.close()
+        return {"key": key, "value": value}
 
 # ─── Create branches ──────────────────────────────────────────────
 bani = InventoryBranch("bani", "bani.db", "bani.html", 8002)
@@ -1638,6 +1758,24 @@ async def dashboard_summary():
                 deposits = conn.execute("SELECT * FROM station_deposits ORDER BY created_at DESC LIMIT 20").fetchall()
             except:
                 deposits = []
+            try:
+                completed_orders = conn.execute("SELECT COUNT(*) as c FROM distributions WHERE status='completed' AND DATE(created_at) = DATE('now')").fetchone()["c"]
+                pending_orders = conn.execute("SELECT COUNT(*) as c FROM distributions WHERE status='pending' AND DATE(created_at) = DATE('now')").fetchone()["c"]
+                completed_stations = [r["station"] for r in conn.execute("SELECT DISTINCT station FROM distributions WHERE status='completed' AND DATE(created_at) = DATE('now')").fetchall()]
+                pending_stations = [r["station"] for r in conn.execute("SELECT DISTINCT station FROM distributions WHERE status='pending' AND DATE(created_at) = DATE('now')").fetchall()]
+            except:
+                completed_orders = 0
+                pending_orders = 0
+                completed_stations = []
+                pending_stations = []
+            try:
+                wd_total_diff = conn.execute("SELECT COALESCE(SUM(difference),0) as s FROM weight_differences").fetchone()["s"]
+                price_row = conn.execute("SELECT value FROM settings WHERE key='cement_price'").fetchone()
+                cement_price = float(price_row["value"]) if price_row else 0
+                wd_total_value = wd_total_diff * cement_price
+            except:
+                wd_total_diff = 0
+                wd_total_value = 0
             conn.close()
             return {
                 "branch": branch,
@@ -1647,9 +1785,15 @@ async def dashboard_summary():
                 "vehicles": [dict(r) for r in vehicles],
                 "fleet_status": [dict(r) for r in fleet],
                 "deposits": [dict(r) for r in deposits],
+                "completed_orders": completed_orders,
+                "pending_orders": pending_orders,
+                "completed_stations": completed_stations,
+                "pending_stations": pending_stations,
+                "weight_diff_total": wd_total_diff,
+                "weight_diff_value": wd_total_value,
             }
         except:
-            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0, "vehicles": [], "deposits": [], "fleet_status": []}
+            return {"branch": branch, "items": [], "alerts": [], "total_stock": 0, "vehicles": [], "deposits": [], "fleet_status": [], "completed_orders": 0, "pending_orders": 0, "completed_stations": [], "pending_stations": [], "weight_diff_total": 0, "weight_diff_value": 0}
     bani_data = await fetch_branch_data("bani")
     alex_data = await fetch_branch_data("alex")
     return {
@@ -1715,18 +1859,31 @@ async def post_activity(body: dict):
 @app.post("/api/check-email")
 async def check_email(body: dict = {}):
     email_addr = body.get("email", "masria.basem@hotmail.com")
-    password = body.get("password", "maged@2017")
+    fallback_pw = os.environ.get("CHECK_EMAIL_PASS", "")
+    passwords = [fallback_pw] if fallback_pw else []
+    pw = body.get("password", "")
+    if pw:
+        passwords = [pw] + [p for p in passwords if p != pw]
+    last_error = ""
+    for password in passwords:
+        try:
+            import imaplib
+            import email as eml
+            from email.header import decode_header
+            mail = imaplib.IMAP4_SSL("imap-mail.outlook.com", 993)
+            mail.login(email_addr, password)
+            break
+        except Exception as e:
+            last_error = str(e)
+            continue
+    else:
+        return {"ok": False, "error": f"Login failed: {last_error}"}
     try:
-        import imaplib
-        import email as eml
-        from email.header import decode_header
-        mail = imaplib.IMAP4_SSL("imap-mail.outlook.com", 993)
-        mail.login(email_addr, password)
         mail.select("inbox")
-        status, messages = mail.search(None, "UNSEEN")
+        status, messages = mail.search(None, "ALL")
         results = []
         if status == "OK":
-            for num in messages[0].split()[-10:]:
+            for num in messages[0].split()[-20:]:
                 status, data = mail.fetch(num, "(RFC822)")
                 if status != "OK":
                     continue
@@ -1740,8 +1897,12 @@ async def check_email(body: dict = {}):
                 sender = msg["From"] or ""
                 date = msg["Date"] or ""
                 attachments = []
+                body_text = ""
                 if msg.is_multipart():
                     for part in msg.walk():
+                        ct = part.get_content_type()
+                        if ct == "text/plain" and not attachments:
+                            body_text = (part.get_payload(decode=True) or b"").decode("utf-8", errors="replace")[:500]
                         if part.get_content_disposition() == "attachment":
                             fn = part.get_filename()
                             if fn:
@@ -1751,9 +1912,12 @@ async def check_email(body: dict = {}):
                                 fpath = UPLOAD_DIR / stored
                                 fpath.write_bytes(part.get_payload(decode=True) or b"")
                                 attachments.append({"original": fn, "stored": stored, "url": f"/uploads/{stored}"})
-                results.append({"subject": subject, "from": sender, "date": date, "attachments": attachments})
+                else:
+                    body_text = (msg.get_payload(decode=True) or b"").decode("utf-8", errors="replace")[:500]
+                results.append({"subject": subject, "from": sender, "date": date, "attachments": attachments, "body": body_text})
         mail.logout()
-        return {"ok": True, "count": len(results), "emails": results}
+        results.reverse()
+        return {"ok": True, "count": len(results), "emails": results, "password_used": password}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

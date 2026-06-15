@@ -11,3 +11,4 @@ build/
 *.pdf
 .DS_Store
 nohup.out
+uploads/
