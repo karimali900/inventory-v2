@@ -12,3 +12,4 @@ build/
 .DS_Store
 nohup.out
 uploads/
+push_deploy

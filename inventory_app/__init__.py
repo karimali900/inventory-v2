@@ -17,10 +17,21 @@ from pydantic import BaseModel
 from jose import jwt
 from passlib.context import CryptContext
 
+# ─── .env ─────────────────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(Path(__file__).parent.parent / ".env")
+except ImportError:
+    pass
+
 # ─── Auth ─────────────────────────────────────────────────────────
 SECRET_KEY = os.environ.get("JWT_SECRET")
 if not SECRET_KEY:
-    raise RuntimeError("JWT_SECRET environment variable is required")
+    if os.environ.get("DEV_MODE"):
+        SECRET_KEY = "dev-secret-change-in-production"
+    else:
+        raise RuntimeError("JWT_SECRET environment variable is required")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES =600
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -50,7 +61,10 @@ def init_users_db():
     admin_user = os.environ.get("ADMIN_USER", "admin")
     admin_pass = os.environ.get("ADMIN_PASS")
     if not admin_pass:
-        raise RuntimeError("ADMIN_PASS environment variable is required")
+        if os.environ.get("DEV_MODE"):
+            admin_pass = "admin123"
+        else:
+            raise RuntimeError("ADMIN_PASS environment variable is required")
     existing = conn.execute("SELECT id FROM users WHERE username=?", (admin_user,)).fetchone()
     if not existing:
         conn.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')",
@@ -171,14 +185,6 @@ def cleanup_stale_sessions(max_minutes: int = 5):
              if datetime.fromisoformat(s["last_seen"]) < cutoff]
     for u in stale:
         del active_sessions[u]
-
-# ─── .env ─────────────────────────────────────────────────────────
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-    load_dotenv(Path(__file__).parent.parent / ".env")
-except ImportError:
-    pass
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -755,11 +761,7 @@ class InventoryBranch:
 
     async def list_orders(self):
         conn = self.db()
-        cutoff = (datetime.utcnow() - timedelta(hours=24)).isoformat()
-        rows = conn.execute(
-            "SELECT customer_name, item_name, SUM(quantity) as total_qty, unit, COUNT(*) as order_count, (SELECT phone FROM customer_orders WHERE customer_name=co.customer_name AND status='accepted' AND created_at >= ? ORDER BY id DESC LIMIT 1) as phone FROM customer_orders co WHERE status='accepted' AND created_at >= ? GROUP BY customer_name, item_name ORDER BY customer_name",
-            (cutoff, cutoff)
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM customer_orders ORDER BY created_at DESC").fetchall()
         conn.close()
         return [dict(r) for r in rows]
 
